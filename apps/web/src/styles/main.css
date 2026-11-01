@@ -105,7 +105,7 @@ button {
 }
 .exercise-floorplan-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 18px;
 }
@@ -138,32 +138,45 @@ button {
 .exercise-map-marker {
   position: absolute;
   z-index: 1;
-  max-width: min(200px, 45vw);
-  min-height: var(--touch-target);
-  padding: 8px 12px;
+  display: grid;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  place-items: center;
+  padding: 0;
   transform: translate(-50%, -50%);
-  border: 2px solid #fff;
+  border: 0;
   border-radius: 999px;
-  background: #59645a;
-  color: white;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-  box-shadow: 0 4px 16px #0008;
+  background: transparent;
   cursor: pointer;
   touch-action: manipulation;
 }
+.exercise-map-marker::before {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #2f9e65;
+  box-shadow: 0 3px 12px #000b;
+  content: '';
+}
 .exercise-map-marker-match {
-  background: var(--color-accent);
-  color: #182014;
+  --marker-color: #df4545;
+}
+.exercise-map-marker-other {
+  --marker-color: #2f9e65;
+}
+.exercise-map-marker::before {
+  background: var(--marker-color, #2f9e65);
 }
 .exercise-map-marker-selected {
-  outline: 4px solid #fff;
-  box-shadow:
-    0 0 0 8px rgb(164 209 117 / 45%),
-    0 4px 18px #0008;
+  z-index: 2;
+  outline: 3px solid #fff;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 35%);
+}
+.exercise-map-marker:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 1px;
 }
 .exercise-equipment-panel {
   display: grid;
@@ -173,6 +186,11 @@ button {
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: rgb(255 255 255 / 3%);
+}
+@media (min-width: 1100px) {
+  .exercise-floorplan-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+  }
 }
 .exercise-equipment-panel h3,
 .exercise-equipment-panel h4,

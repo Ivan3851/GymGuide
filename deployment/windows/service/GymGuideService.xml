@@ -1,0 +1,21 @@
+<service>
+  <id>GymGuide</id>
+  <name>GymGuide Local API</name>
+  <description>Local GymGuide Sails API and production frontend.</description>
+  <env name="NODE_ENV" value="production" />
+  <env name="DOTENV_CONFIG_PATH" value="C:\ProgramData\GymGuide\config\gymguide.env" />
+  <executable>%BASE%\current\runtime\node.exe</executable>
+  <arguments>-r dotenv/config "%BASE%\current\app\scripts\start-production.js"</arguments>
+  <workingdirectory>%BASE%\current\app</workingdirectory>
+  <logpath>%ProgramData%\GymGuide\logs\service</logpath>
+  <log mode="roll" />
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>30 sec</stoptimeout>
+  <startmode>Automatic</startmode>
+  <serviceaccount>
+    <username>NT AUTHORITY\LocalService</username>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+</service>

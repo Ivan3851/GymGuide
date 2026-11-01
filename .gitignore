@@ -23,6 +23,13 @@ apps/api/.env.*
 /backups/
 
 # Persistent deployment data
+/deployment/windows/staging/
+/deployment/windows/output/
+/deployment/windows/**/*.exe
+/deployment/windows/**/*.msi
+/deployment/windows/**/*.issbin
+/deployment/windows/**/*.backup/
+/deployment/windows/**/*.partial/
 
 # Editor and operating system files
 .vscode/*

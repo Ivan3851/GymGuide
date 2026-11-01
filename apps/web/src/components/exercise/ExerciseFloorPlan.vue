@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { exerciseMarkerClasses } from './exercise-marker-state.js'
 
 const props = defineProps({ locations: { type: Object, required: true } })
 const selectedFloorId = ref('')
@@ -37,6 +38,13 @@ watch(
   },
   { immediate: true },
 )
+
+watch(selectedFloorId, (floorId) => {
+  const floor = props.locations.floorPlans.find((item) => item.id === floorId)
+  if (!floor?.markers.some((marker) => marker.gymEquipment.id === selectedEquipmentId.value)) {
+    selectedEquipmentId.value = floor?.markers[0]?.gymEquipment.id || ''
+  }
+})
 </script>
 
 <template>
@@ -75,17 +83,12 @@ watch(
               v-for="marker in currentFloor.markers"
               :key="marker.id"
               class="exercise-map-marker"
-              :class="{
-                'exercise-map-marker-match': marker.matchesExercise,
-                'exercise-map-marker-selected': selectedEquipmentId === marker.gymEquipment.id,
-              }"
+              :class="exerciseMarkerClasses(marker, selectedEquipmentId)"
               :style="{ left: `${marker.x * 100}%`, top: `${marker.y * 100}%` }"
               :aria-label="`${marker.gymEquipment.displayName}${marker.matchesExercise ? ', matches this exercise' : ''}`"
               :aria-pressed="selectedEquipmentId === marker.gymEquipment.id"
               @click="selectedEquipmentId = marker.gymEquipment.id"
-            >
-              {{ marker.gymEquipment.displayName }}
-            </button>
+            ></button>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { getMuscleGroups } from '@/api/catalog'
 import SelectionCard from '@/components/shared/SelectionCard.vue'
 import StatePanel from '@/components/shared/StatePanel.vue'
@@ -9,6 +9,9 @@ import { useApiHealth } from '@/composables/useApiHealth'
 const { isConnected, hasChecked } = useApiHealth()
 const { data, isLoading, error, load } = useAsyncData(getMuscleGroups)
 onMounted(() => load())
+watch(isConnected, (connected) => {
+  if (connected && error.value) load()
+})
 </script>
 
 <template>

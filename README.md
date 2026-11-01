@@ -6,7 +6,7 @@ GymGuide is a local touchscreen gym guidance kiosk with a MongoDB-backed exercis
 
 - `apps/api` — Sails.js API, Waterline models, catalog services, MongoDB indexes, and demo seed process.
 - `apps/web` — Vue 3 + Vite interface, Vue Router pages, API client, and reusable interface components.
-- `deployment/windows` — reserved for the future Windows kiosk installer and service configuration.
+- `deployment/windows` — Windows 11 Pro offline installer, service, kiosk, backup and recovery preparation. See [Windows deployment guide](deployment/windows/README.md).
 - `docs` — product and operating notes.
 
 The frontend and backend have separate package manifests and lockfiles, so each can be installed and developed independently. Vite proxies `/api` to Sails during development. Production builds go to `apps/api/assets`, which Sails serves with the API.
