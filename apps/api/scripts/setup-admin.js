@@ -2,6 +2,7 @@ const path = require('node:path')
 const readline = require('node:readline')
 const bcrypt = require('bcryptjs')
 const { Sails } = require('sails')
+const AdminProvisioningService = require('../api/services/AdminProvisioningService')
 
 function promptHidden(question) {
   return new Promise((resolve) => {
@@ -56,12 +57,8 @@ async function main() {
       .trim()
       .toLowerCase() || null
   const password = process.env.ADMIN_PASSWORD || (await promptHidden('Admin password (hidden): '))
-  if (!/^[a-z0-9._-]{3,80}$/.test(username))
-    throw new Error(
-      'Username must be 3-80 lowercase letters, numbers, dots, underscores or hyphens.',
-    )
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    throw new Error('Enter a valid email address or leave it blank.')
+  AdminProvisioningService.validateUsername(username)
+  AdminProvisioningService.validateEmail(email)
   if (password.length < 12 || password.length > 128 || Buffer.byteLength(password, 'utf8') > 72)
     throw new Error('Password must be 12–128 characters and no more than 72 UTF-8 bytes.')
 
@@ -77,29 +74,14 @@ async function main() {
     if (!(await db.collection('gyms').findOne({ _id: gymId, status: 'active' })))
       throw new Error(`Active gym "${gymId}" not found. Run npm run seed:demo first.`)
     const passwordHash = await bcrypt.hash(password, 12)
-    const now = Date.now()
-    const existing = await db.collection('adminUsers').findOne({ username })
-    const id = existing ? String(existing._id) : `admin-${username}`
-    await db.collection('adminUsers').updateOne(
-      { _id: id },
-      {
-        $set: {
-          username,
-          ...(email ? { email } : {}),
-          passwordHash,
-          role: 'gym-admin',
-          gymId,
-          isActive: true,
-          updatedAt: now,
-        },
-        ...(email ? {} : { $unset: { email: '' } }),
-        $setOnInsert: { _id: id, createdAt: now },
-      },
-      { upsert: true },
-    )
-    console.log(
-      `Admin account ${existing ? 'created or reset' : 'created'} for username "${username}".`,
-    )
+    const result = await AdminProvisioningService.provision(db, {
+      username,
+      email,
+      passwordHash,
+      gymId,
+      resetExisting: process.argv.includes('--reset-existing'),
+    })
+    console.log(`Admin account ${result.action} for username "${username}".`)
   } finally {
     await new Promise((resolve) => app.lower(() => resolve()))
   }

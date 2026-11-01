@@ -2,22 +2,9 @@ const net = require('node:net')
 const http = require('node:http')
 const { spawn } = require('node:child_process')
 const path = require('node:path')
+const { resolveProductionConfig } = require('../api/services/LocalProductionConfig')
 
-const mongoUri = process.env.MONGODB_URI
 const readinessRetryMs = Number(process.env.MONGODB_READINESS_RETRY_MS || 2000)
-
-function mongoAddress(uri) {
-  if (!uri) throw new Error('MONGODB_URI must be configured before production startup.')
-  const parsed = new URL(uri)
-  if (!['mongodb:', 'mongodb+srv:'].includes(parsed.protocol))
-    throw new Error('MONGODB_URI must use mongodb:// or mongodb+srv://.')
-  if (parsed.protocol === 'mongodb+srv:')
-    throw new Error('A local Windows kiosk requires a mongodb:// TCP connection.')
-  const host = (parsed.hostname || '127.0.0.1').replace(/^\[|\]$/g, '')
-  if (!['127.0.0.1', '::1', 'localhost'].includes(host))
-    throw new Error('Production MONGODB_URI must point to a local MongoDB address.')
-  return { host, port: Number(parsed.port || 27017) }
-}
 
 function waitForMongo({ host, port }) {
   return new Promise((resolve) => {
@@ -60,11 +47,12 @@ function createStartupPage(host, port) {
 }
 
 async function main() {
-  const address = mongoAddress(mongoUri)
+  const production = resolveProductionConfig(process.env, path.resolve(__dirname, '..'))
+  const address = production.mongo
   if (!Number.isInteger(readinessRetryMs) || readinessRetryMs < 250 || readinessRetryMs > 60_000)
     throw new Error('MONGODB_READINESS_RETRY_MS must be between 250 and 60000 milliseconds.')
   process.env.NODE_ENV = 'production'
-  const host = process.env.HOST || '127.0.0.1'
+  const host = production.host
   const port = Number(process.env.PORT || 1337)
   if (!['127.0.0.1', '::1', 'localhost'].includes(host))
     throw new Error('Production HOST must be a loopback address.')
@@ -88,10 +76,15 @@ async function main() {
       stdio: 'inherit',
       windowsHide: true,
     })
-    const exit = await new Promise((resolve, reject) => {
-      api.once('error', reject)
+    const exit = await new Promise((resolve) => {
+      api.once('error', (error) => resolve({ spawnError: error }))
       api.once('exit', (code, signal) => resolve({ code, signal }))
     })
+    if (exit.spawnError) {
+      console.error(`Could not start the Sails process: ${exit.spawnError.message}`)
+      await new Promise((resolve) => setTimeout(resolve, 5000))
+      continue
+    }
     console.error(
       `Sails stopped (code ${exit.code ?? 'none'}${exit.signal ? `, signal ${exit.signal}` : ''}); restarting after 5 seconds.`,
     )

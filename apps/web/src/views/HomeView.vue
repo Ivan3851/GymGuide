@@ -1,12 +1,12 @@
 <script setup>
-import { onMounted, watch } from 'vue'
+import { inject, onMounted, watch } from 'vue'
 import { getMuscleGroups } from '@/api/catalog'
 import SelectionCard from '@/components/shared/SelectionCard.vue'
 import StatePanel from '@/components/shared/StatePanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
-import { useApiHealth } from '@/composables/useApiHealth'
+import { API_HEALTH_KEY } from '@/composables/api-health-key'
 
-const { isConnected, hasChecked } = useApiHealth()
+const { isConnected, hasChecked } = inject(API_HEALTH_KEY)
 const { data, isLoading, error, load } = useAsyncData(getMuscleGroups)
 onMounted(() => load())
 watch(isConnected, (connected) => {

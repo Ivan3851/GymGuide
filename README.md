@@ -64,13 +64,13 @@ Run:
 npm run seed:demo
 ```
 
-The seed upserts records using stable demo IDs. Running it again updates the same records and does not create duplicates. It does not drop collections or delete unrelated data. Demo source records are kept in `apps/api/api/data/demo-catalog.js` so the sample content is easy to replace.
+The seed uses stable demo IDs and insert-only writes. Running it again does not create duplicates or overwrite edited content. Before writing, it stops if any catalog or inventory collection contains non-demo records. Demo source records are kept in `apps/api/api/data/demo-catalog.js` so the sample content is easy to replace. Startup never runs the seed automatically.
 
 The seed contains 9 muscle groups, 8 reusable equipment types, 12 exercises, 4 exercise variations, exercise-to-muscle and exercise-to-equipment relationships, one demo gym, and 8 gym-specific equipment units. Exercise media references are empty; the interface shows an explicit video placeholder.
 
-### Reset guidance
+### Demo data setup
 
-For ordinary refreshes, use `npm run seed:demo`; no reset is needed. If you deliberately want a clean demo database, first confirm that `MONGODB_URI` points to the dedicated `gymguide_dev` database, stop the API, and make a backup. Then use MongoDB Compass to remove only the verified `gymguide_dev` database and rerun the seed. Never run a reset against a database containing gym or production data.
+For ordinary startup, do not reset the database. To try the demo seed without touching existing content, set `MONGODB_URI` to a newly named local database (for example, `gymguide_demo_poc`) and run `npm run seed:demo` explicitly. The seed will refuse to run if it finds non-demo records. It never deletes collections or overwrites existing documents.
 
 ## Start the backend and frontend
 
@@ -107,7 +107,9 @@ Seed the demo gym, then run this command from the repository root:
 npm run setup:admin
 ```
 
-The setup process asks for a username, optional email and password. Password entry is hidden. A password must be 12–128 characters. It creates or resets the named admin account for the active gym. No default account or password exists. Keep the password and `SESSION_SECRET` private; `.env` is ignored by Git. The setup process only updates that admin account and does not reset catalog or gym data.
+The setup process asks for a username, optional email and password. Password entry is hidden. A password must be 12–128 characters. It creates the named admin account only when that username does not exist. If it already exists, setup refuses to change it. An intentional password reset requires adding `--reset-existing`; this changes only the password and optional email, preserving the account's role, gym assignment and active state. No default account or password exists. Keep the password and `SESSION_SECRET` private; `.env` is ignored by Git.
+
+Only when you intend to reset an existing account, run `npm run setup:admin -- --reset-existing`.
 
 Passwords are limited to 72 UTF-8 bytes because bcrypt only processes up to 72 bytes. The installer/update phase should provision a unique `SESSION_SECRET` before starting Sails with `NODE_ENV=production`.
 

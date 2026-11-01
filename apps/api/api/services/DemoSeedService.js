@@ -54,8 +54,15 @@ async function upsertBySlug(collection, record) {
   return collection.updateOne(
     { _id: slug },
     {
-      $set: { ...record, slug, isDemo: true, seedSource: 'phase-2-demo', updatedAt: now },
-      $setOnInsert: { _id: slug, createdAt: now },
+      $setOnInsert: {
+        ...record,
+        _id: slug,
+        slug,
+        isDemo: true,
+        seedSource: 'phase-2-demo',
+        createdAt: now,
+        updatedAt: now,
+      },
     },
     { upsert: true },
   )
@@ -66,8 +73,14 @@ async function upsertRelation(collection, id, fields) {
   return collection.updateOne(
     { _id: id },
     {
-      $set: { ...fields, isDemo: true, seedSource: 'phase-2-demo', updatedAt: now },
-      $setOnInsert: { _id: id, createdAt: now },
+      $setOnInsert: {
+        ...fields,
+        _id: id,
+        isDemo: true,
+        seedSource: 'phase-2-demo',
+        createdAt: now,
+        updatedAt: now,
+      },
     },
     { upsert: true },
   )
@@ -77,14 +90,37 @@ function relationId(...parts) {
   return parts.join('--')
 }
 
+const seedCollections = [
+  'gyms',
+  'muscleGroups',
+  'equipmentTypes',
+  'exercises',
+  'exerciseVariations',
+  'exerciseMuscles',
+  'exerciseEquipment',
+  'gymEquipment',
+]
+
+async function assertSeedTargetIsDemoOnly(db) {
+  for (const collectionName of seedCollections) {
+    const existingRecord = await db.collection(collectionName).findOne({ isDemo: { $ne: true } })
+    if (existingRecord) {
+      throw new Error(
+        `Demo seed stopped because ${collectionName} contains non-demo data. Choose an empty demo database; existing records were not changed.`,
+      )
+    }
+  }
+}
+
 module.exports = {
   validateDemoCatalog,
+  assertSeedTargetIsDemoOnly,
 
   seed: async function seed(sailsInstance, gymId = process.env.GYMGUIDE_GYM_ID || 'demo-gym') {
     validateDemoCatalog()
-    await databaseIndexes.ensure(sailsInstance)
-
     const db = sailsInstance.hooks.orm.datastores.default.manager.client.db()
+    await assertSeedTargetIsDemoOnly(db)
+    await databaseIndexes.ensure(sailsInstance)
     const counts = {}
     const upsertMany = async (collectionName, records) => {
       let inserted = 0

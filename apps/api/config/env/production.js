@@ -1,5 +1,9 @@
+const { resolveProductionConfig } = require('../../api/services/LocalProductionConfig')
+
+const production = resolveProductionConfig(process.env, process.cwd())
+
 module.exports = {
-  explicitHost: process.env.HOST || '127.0.0.1',
+  explicitHost: production.host,
   models: {
     migrate: 'safe',
   },

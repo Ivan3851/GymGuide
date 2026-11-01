@@ -1,9 +1,14 @@
 <script setup>
-import { onBeforeUnmount, onMounted, watch } from 'vue'
+import { onBeforeUnmount, onMounted, provide, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import { getKioskSettings } from '@/api/kiosk'
 import { createMemberIdleController } from '@/composables/member-idle-controller'
+import { API_HEALTH_KEY } from '@/composables/api-health-key'
+import { useApiHealth } from '@/composables/useApiHealth'
+
+const apiHealth = useApiHealth(() => window.location.reload())
+provide(API_HEALTH_KEY, apiHealth)
 
 const route = useRoute()
 const router = useRouter()
