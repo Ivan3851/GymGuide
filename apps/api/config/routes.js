@@ -1,0 +1,58 @@
+const requireAdmin = require('../api/policies/require-admin')
+const requireCsrf = require('../api/policies/require-csrf')
+
+module.exports.routes = {
+  'GET /api/v1/health': { action: 'health/check' },
+  'GET /api/v1/kiosk/settings': { action: 'kiosk/settings' },
+  'GET /api/v1/muscle-groups': { action: 'muscle-groups/index' },
+  'GET /api/v1/muscle-groups/:id/equipment': { action: 'muscle-groups/equipment' },
+  'GET /api/v1/equipment/:id/exercises': { action: 'equipment/exercises' },
+  'GET /api/v1/exercises/:id': { action: 'exercises/show' },
+  'GET /api/v1/exercises/:id/variations': { action: 'exercises/variations' },
+  'GET /api/v1/media/:id/content': { action: 'media/content' },
+  'GET /api/v1/floor-plans': { action: 'floor-plans/index' },
+  'GET /api/v1/floor-plans/:id': { action: 'floor-plans/show' },
+  'GET /api/v1/auth/csrf': { action: 'auth/csrf' },
+  'POST /api/v1/auth/login': [requireCsrf, { action: 'auth/login' }],
+  'POST /api/v1/auth/logout': [requireAdmin, requireCsrf, { action: 'auth/logout' }],
+  'GET /api/v1/auth/session': { action: 'auth/session' },
+  'GET /api/v1/admin/dashboard': [requireAdmin, { action: 'admin/dashboard' }],
+  'GET /api/v1/admin/settings': [requireAdmin, { action: 'admin/settings' }],
+  'PUT /api/v1/admin/settings': [requireAdmin, requireCsrf, { action: 'admin/settings' }],
+  'GET /api/v1/admin/media': [requireAdmin, { action: 'admin/media-list' }],
+  'POST /api/v1/admin/media': [requireAdmin, requireCsrf, { action: 'admin/media-upload' }],
+  'DELETE /api/v1/admin/media/:id': [requireAdmin, requireCsrf, { action: 'admin/media-delete' }],
+  'GET /api/v1/admin/floor-plans/:id/markers': [
+    requireAdmin,
+    { action: 'admin/floor-plan-markers' },
+  ],
+  'PUT /api/v1/admin/floor-plans/:id/markers/:equipmentId': [
+    requireAdmin,
+    requireCsrf,
+    { action: 'admin/floor-plan-marker-save' },
+  ],
+  'DELETE /api/v1/admin/floor-plans/:id/markers/:equipmentId': [
+    requireAdmin,
+    requireCsrf,
+    { action: 'admin/floor-plan-marker-delete' },
+  ],
+  'GET /api/v1/admin/:resource': [requireAdmin, { action: 'admin/list' }],
+  'POST /api/v1/admin/:resource': [requireAdmin, requireCsrf, { action: 'admin/create' }],
+  'PUT /api/v1/admin/:resource/:id': [requireAdmin, requireCsrf, { action: 'admin/update' }],
+  'PATCH /api/v1/admin/:resource/:id/archive': [
+    requireAdmin,
+    requireCsrf,
+    { action: 'admin/archive' },
+  ],
+  'PATCH /api/v1/admin/:resource/:id/restore': [
+    requireAdmin,
+    requireCsrf,
+    { action: 'admin/restore' },
+  ],
+  'GET /api/v1/*': { action: 'api/not-found', skipAssets: true },
+  'GET /admin': { action: 'frontend/index' },
+  'GET /admin/*': { action: 'frontend/index', skipAssets: true },
+  'GET /muscle-groups/*': { action: 'frontend/index', skipAssets: true },
+  'GET /equipment/*': { action: 'frontend/index', skipAssets: true },
+  'GET /exercises/*': { action: 'frontend/index', skipAssets: true },
+}

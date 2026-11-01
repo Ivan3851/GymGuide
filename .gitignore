@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+apps/api/assets/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+apps/api/.env
+apps/api/.env.*
+!apps/api/.env.example
+
+# Runtime data, logs, and local database files
+.tmp/
+*.log
+*.pid
+
+# Root-level local runtime data
+/data/
+/media/
+/backups/
+
+# Persistent deployment data
+
+# Editor and operating system files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

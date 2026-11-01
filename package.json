@@ -1,0 +1,26 @@
+{
+  "name": "gymguide",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "seed:demo": "npm --prefix apps/api run seed:demo",
+    "setup:admin": "npm --prefix apps/api run setup:admin",
+    "test": "npm --prefix apps/api test && npm --prefix apps/web test",
+    "build": "npm --prefix apps/web run build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.5.1",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2"
+  }
+}

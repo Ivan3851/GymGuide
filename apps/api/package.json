@@ -1,0 +1,19 @@
+{
+  "name": "@gymguide/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node -r dotenv/config node_modules/sails/bin/sails.js lift",
+    "start": "node -r dotenv/config node_modules/sails/bin/sails.js lift",
+    "seed:demo": "node -r dotenv/config scripts/seed-demo.js",
+    "setup:admin": "node -r dotenv/config scripts/setup-admin.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.6.1",
+    "sails": "1.5.18",
+    "sails-hook-orm": "^4.0.2",
+    "sails-mongo": "2.1.2"
+  }
+}
