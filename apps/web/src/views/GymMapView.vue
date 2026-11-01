@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import PageHeading from '@/components/shared/PageHeading.vue'
 import StatePanel from '@/components/shared/StatePanel.vue'
+import FloorPlanCanvas from '@/components/floor-plan/FloorPlanCanvas.vue'
 import { getGymMapFloorPlans } from '@/api/catalog'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { apiErrorMessageKey } from '@/localization/api-error'
@@ -38,6 +39,19 @@ const localizedEquipment = computed(() =>
     ? localizeEquipmentUnit(currentMarker.value.gymEquipment, locale.value)
     : null,
 )
+const localizedFloor = computed(() =>
+  currentFloor.value
+    ? {
+        ...currentFloor.value,
+        markers: currentFloor.value.markers.map((marker) => ({
+          ...marker,
+          gymEquipment: localizeEquipmentUnit(marker.gymEquipment, locale.value),
+        })),
+      }
+    : null,
+)
+
+onMounted(() => load())
 
 watch(
   floors,
@@ -87,22 +101,21 @@ watch(selectedFloorId, (floorId) => {
         </label>
       </div>
       <section v-if="currentFloor" class="gym-map-layout" :aria-label="t('map.title')">
-        <div class="gym-map-canvas">
-          <img
-            :src="currentFloor.image.contentUrl"
-            :alt="`${currentFloor.name} · ${t('map.title')}`"
-          />
-          <button
-            v-for="marker in currentFloor.markers"
-            :key="marker.id"
-            class="gym-map-marker"
-            :class="{ 'gym-map-marker-selected': selectedEquipmentId === marker.gymEquipment.id }"
-            :style="{ left: `${marker.x * 100}%`, top: `${marker.y * 100}%` }"
-            :aria-label="localizeEquipmentUnit(marker.gymEquipment, locale).displayName"
-            :aria-pressed="selectedEquipmentId === marker.gymEquipment.id"
-            @click="selectedEquipmentId = marker.gymEquipment.id"
-          ></button>
-        </div>
+        <StatePanel
+          v-if="!currentFloor.image?.contentUrl"
+          :title="t('map.imageUnavailable')"
+          :message="t('map.imageUnavailableMessage')"
+          tone="error"
+        />
+        <FloorPlanCanvas
+          v-else
+          class="gym-map-canvas"
+          :floor="localizedFloor"
+          :selected-equipment-id="selectedEquipmentId"
+          marker-mode="general"
+          :image-label="t('map.title')"
+          @select-marker="selectedEquipmentId = $event"
+        />
         <aside class="gym-map-info" :aria-label="t('map.equipmentInfo')">
           <template v-if="localizedEquipment">
             <p class="eyebrow">{{ t('map.equipmentInfo') }}</p>

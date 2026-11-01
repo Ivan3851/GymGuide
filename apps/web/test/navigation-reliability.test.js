@@ -46,13 +46,38 @@ test('invalid map positions and equipment without ids are not shown as markers',
 test('member map uses floor-plan data and neutral markers without exercise match classes', async () => {
   const component = await readFile(new URL('../src/views/GymMapView.vue', import.meta.url), 'utf8')
   const api = await readFile(new URL('../src/api/catalog.js', import.meta.url), 'utf8')
+  const canvas = await readFile(
+    new URL('../src/components/floor-plan/FloorPlanCanvas.vue', import.meta.url),
+    'utf8',
+  )
+  const canvasStyles = await readFile(new URL('../src/styles/main.css', import.meta.url), 'utf8')
+  const exerciseMap = await readFile(
+    new URL('../src/components/exercise/ExerciseFloorPlan.vue', import.meta.url),
+    'utf8',
+  )
   const styles = await readFile(new URL('../src/styles/redesign.css', import.meta.url), 'utf8')
-  assert.match(api, /\/api\/v1\/floor-plans\?includeUnavailable=true/)
+  assert.match(api, /\/api\/v1\/floor-plans\?includeUnavailable=true&includeMissingImages=true/)
   assert.match(component, /v-for="floor in floors"/)
-  assert.match(component, /class="gym-map-marker"/)
+  assert.match(component, /onMounted\(\(\) => load\(\)\)/)
+  assert.match(component, /<FloorPlanCanvas/)
+  assert.match(component, /validMapMarkers\(floor\.markers\)/)
+  assert.match(component, /map\.imageUnavailable/)
+  assert.match(component, /@select-marker="selectedEquipmentId = \$event"/)
   assert.doesNotMatch(component, /exercise-map-marker-(?:match|other)/)
-  assert.match(styles, /\.gym-map-marker::before[\s\S]*?background: var\(--color-accent\)/)
-  assert.match(styles, /\.gym-map-marker-selected::before[\s\S]*?background: var\(--color-accent\)/)
+  assert.match(component, /<aside class="gym-map-info"/)
+  assert.match(styles, /\.gym-floor-map-marker::before\s*\{[^}]*background: var\(--color-accent\)/)
+  assert.match(canvas, /class="exercise-map-frame"/)
+  assert.match(canvas, /class="exercise-map"/)
+  assert.match(canvas, /marker\.x \* 100/)
+  assert.match(canvas, /marker\.y \* 100/)
+  assert.match(canvas, /markerMode === 'exercise'[\s\S]*?exerciseMarkerClasses/)
+  assert.match(canvas, /'gym-floor-map-marker': true/)
+  assert.match(
+    canvasStyles,
+    /\.exercise-map\s*\{[\s\S]*?display: inline-block;[\s\S]*?max-width: 100%/,
+  )
+  assert.match(canvasStyles, /\.exercise-map > img\s*\{[\s\S]*?max-height: 70vh/)
+  assert.match(exerciseMap, /<FloorPlanCanvas/)
 })
 
 test('member header remains horizontal outside admin routes with map and language controls', async () => {

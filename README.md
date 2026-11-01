@@ -1,209 +1,107 @@
 # GymGuide
 
-GymGuide is a local touchscreen gym guidance kiosk with a MongoDB-backed exercise catalog, gym-specific equipment locations, local media, staff content management and member inactivity reset.
+GymGuide is an offline-first gym guidance kiosk for a Windows PC. Members can browse muscle groups, gym equipment, exercise guidance and floor-plan locations without signing in. Staff use a separate password-protected administration area to manage content and kiosk settings.
 
-## Project structure
+The current application is a single-gym local installation: Vue 3/Vite frontend, Sails.js API, and MongoDB all run on the kiosk PC. Media files are stored on its local disk. The data model already separates shared catalog records from gym-specific inventory and locations. There is no cloud dependency or synchronization service.
 
-- `apps/api` — Sails.js API, Waterline models, catalog services, MongoDB indexes, and demo seed process.
-- `apps/web` — Vue 3 + Vite interface, Vue Router pages, API client, and reusable interface components.
-- `deployment/windows` — Windows 11 Pro offline installer, service, kiosk, backup and recovery preparation. See [Windows deployment guide](deployment/windows/README.md).
-- `docs` — product and operating notes.
+## Current capabilities
 
-The frontend and backend have separate package manifests and lockfiles, so each can be installed and developed independently. Vite proxies `/api` to Sails during development. Production builds go to `apps/api/assets`, which Sails serves with the API.
+- Member browsing for muscle groups, equipment, exercises, variations and exercise details.
+- Exercise and general gym maps using the uploaded plan image and normalized equipment marker positions.
+- Local MP4/JPEG/PNG/WebP media management from the staff area.
+- English and Macedonian interface/content support with fallback behavior.
+- Admin sign-in, content CRUD, media, floor-plan editor and gym settings.
+- Configurable member idle reset, default 60 seconds; active video playback defers reset. Admin routes have a separate session.
+- Persistent production configuration checks and prepared Windows installer/service/backup/update scripts.
 
-## Prerequisites
+See [the documentation index](docs/README.md) for detailed guides and the status of prepared versus field-tested operations.
 
-- Node.js 26.13.0 (verified in the development workspace).
-- npm 11.20.0 (verified in the development workspace).
-- MongoDB Community Server available at `127.0.0.1:27017`.
+## Quick start for developers
 
-The verified local MongoDB server is 9.0.4. Phase 2 successfully connected the Sails adapter to this server using Node 26.13.0. The adapter's published compatibility matrix does not list this exact combination, so it should be rechecked when the packaged runtime or adapter versions change.
+### Prerequisites
 
-## Install dependencies
+- Windows, Git, Node.js and npm. At this documentation review the workspace reports Node.js `v26.13.0` and npm `11.20.0`; verify your current versions with `node -v` and `npm -v` before development. Compatibility with the production runtime must be validated against the exact package locks and MongoDB server.
+- MongoDB Community Server running locally at `127.0.0.1:27017`.
 
-Run from the repository root:
+### Install and configure
+
+Run from the repository root in PowerShell:
 
 ```powershell
 npm install
 npm --prefix apps/api install
 npm --prefix apps/web install
-```
-
-Each app has its own `node_modules` and lockfile. The API-local installation is important because Sails discovers installed ORM hooks from `apps/api/node_modules`.
-
-## Configure MongoDB
-
-MongoDB must be running locally. The default connection is:
-
-```text
-mongodb://127.0.0.1:27017/gymguide_dev
-```
-
-Optional overrides go in `apps/api/.env`. Start by copying the example:
-
-```powershell
 Copy-Item apps/api/.env.example apps/api/.env
 ```
 
-Available values:
+The development default database is `gymguide_dev`. Check `MONGODB_URI` in `apps/api/.env` before running any data command. Do not point demo setup at data you need to preserve.
 
-- `MONGODB_URI` — local MongoDB connection string.
-- `GYMGUIDE_GYM_ID` — gym whose local equipment inventory is browsed; defaults to `demo-gym`.
-- `HOST` and `PORT` — API bind address and port; default to `127.0.0.1` and `1337`.
-- `SESSION_SECRET` — signs admin session cookies. Required by Sails in production; use a long random value and keep it private. The development fallback is only for local development.
-- `SESSION_COOKIE_SECURE` — set to `true` only when serving the application over HTTPS. The local Windows kiosk uses loopback HTTP and should use `false`.
-- `ADMIN_SESSION_MAX_AGE_MS` — admin session cookie lifetime in milliseconds; defaults to 8 hours.
+### Seed and create an admin
 
-`.env` files, credentials, database files, logs, and generated frontend assets are ignored by Git. Do not place secrets in Vite frontend variables.
-
-## Seed the demo catalog
-
-Run:
+The demo seed is explicit, insert-only and refuses to run if non-demo catalog/inventory data is found. It does not run during backend startup.
 
 ```powershell
 npm run seed:demo
+npm run setup:admin
 ```
 
-The seed uses stable demo IDs and insert-only writes. Running it again does not create duplicates or overwrite edited content. Before writing, it stops if any catalog or inventory collection contains non-demo records. Demo source records are kept in `apps/api/api/data/demo-catalog.js` so the sample content is easy to replace. Startup never runs the seed automatically.
+Admin provisioning refuses to replace an existing user. `--reset-existing` is an explicit password reset option; use it only when intentionally resetting the named local account.
 
-The seed contains 9 muscle groups, 8 reusable equipment types, 12 exercises, 4 exercise variations, exercise-to-muscle and exercise-to-equipment relationships, one demo gym, and 8 gym-specific equipment units. Exercise media references are empty; the interface shows an explicit video placeholder.
+### Run
 
-### Demo data setup
-
-For ordinary startup, do not reset the database. To try the demo seed without touching existing content, set `MONGODB_URI` to a newly named local database (for example, `gymguide_demo_poc`) and run `npm run seed:demo` explicitly. The seed will refuse to run if it finds non-demo records. It never deletes collections or overwrites existing documents.
-
-## Start the backend and frontend
-
-Seed once, then use two terminals from the repository root.
-
-Terminal 1:
+Use two PowerShell terminals from the repository root:
 
 ```powershell
 npm run dev:api
 ```
 
-Terminal 2:
-
 ```powershell
 npm run dev:web
 ```
 
-Open `http://127.0.0.1:5173`. The API listens at `http://127.0.0.1:1337`. In development, Vite forwards `/api` requests to Sails.
+Open <http://127.0.0.1:5173>. The API is at <http://127.0.0.1:1337>; Vite proxies `/api` to it. Staff can open `/admin`.
 
-## Member journey
-
-1. Choose a muscle group on the home page.
-2. Choose available equipment at the demo gym.
-3. Choose a compatible exercise.
-4. Read the demo exercise steps, targeted muscles, benefits, tips, common mistakes, and variations.
-
-All browsing information is loaded from the API. Demo exercise and equipment descriptions are fictional sample content and should be replaced with gym-approved guidance before real use.
-
-## Admin account setup
-
-Seed the demo gym, then run this command from the repository root:
-
-```powershell
-npm run setup:admin
-```
-
-The setup process asks for a username, optional email and password. Password entry is hidden. A password must be 12–128 characters. It creates the named admin account only when that username does not exist. If it already exists, setup refuses to change it. An intentional password reset requires adding `--reset-existing`; this changes only the password and optional email, preserving the account's role, gym assignment and active state. No default account or password exists. Keep the password and `SESSION_SECRET` private; `.env` is ignored by Git.
-
-Only when you intend to reset an existing account, run `npm run setup:admin -- --reset-existing`.
-
-Passwords are limited to 72 UTF-8 bytes because bcrypt only processes up to 72 bytes. The installer/update phase should provision a unique `SESSION_SECRET` before starting Sails with `NODE_ENV=production`.
-
-Admin sessions use signed HTTP-only `gymguide.sid` cookies with `SameSite=Strict`; JavaScript cannot read the session cookie. Admin state-changing requests require a per-session CSRF token in `X-CSRF-Token`. Login attempts are limited to 8 per source IP in a 15-minute window. The current session and rate-limit stores are in memory, so a Sails restart signs staff out and resets the rate-limit window. The session cookie survives frontend refreshes while the API process remains up.
-
-Sails automatic REST, shortcut and action blueprints are disabled. Only the explicitly configured `/api/v1` routes are exposed, including the admin routes with their authentication and CSRF policies.
-
-Open the staff area directly at `http://127.0.0.1:5173/admin`. It includes a dashboard and CRUD forms for muscle groups, equipment types, demo-gym inventory, exercises and variations. Member browsing remains public at `/`.
-
-## API routes
-
-Public member routes remain unauthenticated. Admin routes require an authenticated admin session, and all state changes require CSRF validation. All routes use `/api/v1`:
-
-| Method and path                                             | Purpose                                                                           |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `GET /api/v1/health`                                        | Checks API and MongoDB connectivity.                                              |
-| `GET /api/v1/kiosk/settings`                                | Returns the configured member inactivity timeout.                                 |
-| `GET /api/v1/muscle-groups`                                 | Lists active muscle groups.                                                       |
-| `GET /api/v1/muscle-groups/:id/equipment`                   | Lists compatible equipment types and available gym units.                         |
-| `GET /api/v1/equipment/:id/exercises`                       | Lists exercises for an equipment type and their target muscles.                   |
-| `GET /api/v1/exercises/:id`                                 | Returns exercise guidance, media and matching gym equipment/floor plan locations. |
-| `GET /api/v1/exercises/:id/variations`                      | Lists variations for an exercise.                                                 |
-| `GET /api/v1/media/:id/content`                             | Streams referenced media; supports single byte ranges for video seeking.          |
-| `GET /api/v1/floor-plans`                                   | Lists active floor plans for the configured gym.                                  |
-| `GET /api/v1/floor-plans/:id`                               | Returns a floor plan and its active equipment markers.                            |
-| `GET /api/v1/auth/csrf`                                     | Creates/returns a CSRF token for login or subsequent admin mutations.             |
-| `POST /api/v1/auth/login`                                   | Signs in with username/email and password.                                        |
-| `POST /api/v1/auth/logout`                                  | Invalidates the admin session.                                                    |
-| `GET /api/v1/auth/session`                                  | Returns the authenticated admin or 401.                                           |
-| `GET /api/v1/admin/dashboard`                               | Returns active content counts for the signed-in gym.                              |
-| `GET /api/v1/admin/settings` / `PUT /api/v1/admin/settings` | Reads or updates gym kiosk settings (admin and CSRF required for updates).        |
-| `GET /api/v1/admin/:resource`                               | Lists managed content; `includeArchived=true` includes archived entries.          |
-| `POST /api/v1/admin/:resource`                              | Creates a muscle group, equipment type, gym unit, exercise or variation.          |
-| `PUT /api/v1/admin/:resource/:id`                           | Updates a managed record and exercise relationships.                              |
-| `PATCH /api/v1/admin/:resource/:id/archive`                 | Archives without deleting or breaking references.                                 |
-| `PATCH /api/v1/admin/:resource/:id/restore`                 | Restores an archived record.                                                      |
-| `GET /api/v1/admin/media` / `POST /api/v1/admin/media`      | Lists or uploads local media (admin session required).                            |
-| `DELETE /api/v1/admin/media/:id`                            | Deletes an unused media asset; referenced assets return 409.                      |
-| `/api/v1/admin/floor-plans/:id/markers`                     | Lists, places, moves or deletes equipment markers with CSRF-protected mutations.  |
-
-Successful responses use a `{ "data": ... }` envelope. Errors use `{ "error": { "code": ..., "message": ... } }`; invalid IDs return 400, missing records return 404, and database unavailability returns 503.
-
-## Database collections
-
-- `gyms` — gym identity; demo gym ID is `demo-gym`.
-- `gyms.settings.memberInactivityTimeoutSeconds` — per-gym member idle timeout; defaults to 60 seconds and accepts 15–600 seconds.
-- `muscleGroups` — shared catalog of muscle groups.
-- `equipmentTypes` — shared catalog of machine and equipment types.
-- `exercises` — shared instructions, benefits, tips, mistakes, and media reference fields.
-- `exerciseVariations` — variations referencing a parent exercise.
-- `exerciseMuscles` — exercise-to-muscle references with primary or secondary role.
-- `exerciseEquipment` — exercise-to-equipment-type references.
-- `gymEquipment` — gym-owned installed units, linking a `gymId` to an `equipmentTypeId`.
-- `mediaAssets` — uploaded media metadata, generated storage name, size, checksum and status. Binary files live on disk, not in MongoDB.
-- `gymFloorPlans` — gym-owned floor labels and references to floor plan image assets; archiving hides a plan from members.
-- `floorPlanMarkers` — gym equipment placement per plan using normalized `x` and `y` coordinates from 0 to 1.
-- `adminUsers` — gym staff credentials (bcrypt password hashes only), roles and gym assignment. Password hashes are never returned by the API.
-
-References are stored as stable string IDs. Sails model definitions validate field types and required values; the seed validates relationships before writing. Database indexes cover unique slugs, association pairs, ordering, and gym inventory lookups. Indexes are ensured during API startup and demo seeding.
-
-## Verify the API
-
-Health and a sample catalog request:
+Verify health and browse data:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:1337/api/v1/health
-Invoke-RestMethod http://127.0.0.1:1337/api/v1/muscle-groups
+Invoke-RestMethod http://127.0.0.1:5173/api/v1/muscle-groups
 ```
 
-The frontend home page shows the local API status. The Vite API proxy can also be checked directly:
+## Common project commands
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:5173/api/v1/health
-```
-
-## Build and quality checks
-
-```powershell
+npm test
 npm run lint
 npm run format:check
-npm test
 npm run build
 ```
 
-The production frontend build is generated in `apps/api/assets` and served by Sails from the same local origin as the API.
+`npm run build` builds the frontend into `apps/api/assets`, the production static directory served by Sails. It does not create or install a Windows kiosk package.
 
-## Local media and floor plans
+## Important operational notes
 
-In development, uploaded files default to `<repository-root>/data/media`, which is ignored by Git. Set `GYMGUIDE_MEDIA_DIR` in `apps/api/.env` to choose another directory. A Windows installation can set it to a protected directory such as `C:\ProgramData\GymGuide\media`. The API creates separate `.incoming` and `files` subdirectories and stores only generated UUID names. MongoDB stores the original filename and media metadata. The default limits are 512 MiB per video and 15 MiB per image; `MEDIA_MAX_VIDEO_BYTES` and `MEDIA_MAX_IMAGE_BYTES` can override them.
+- Keep `.env`, passwords, database files, media and real gym content out of Git. Use the supplied environment examples as templates.
+- Production requires a strong unique `SESSION_SECRET`, a local MongoDB URI other than `gymguide_dev`, and an absolute media directory outside the versioned application folder.
+- Database and media must be backed up as a matched set. The Windows scripts are operator-run and can be destructive during restore; read [Windows deployment](deployment/windows/README.md) first.
+- The installer, Windows services, Assigned Access kiosk, backup/restore and update flow are prepared artifacts, not evidence of a customer installation or power-loss test. Rehearse them on a disposable Windows 11 Pro machine before rollout.
+- The demo exercise copy is fictional and must be reviewed by qualified gym staff before member use.
 
-Only MP4, JPEG, PNG and WebP are accepted. The API checks the extension, MIME type, leading file signature and type-specific size limit. An admin previews assets in `/admin/media`, then can select them on exercise or floor-plan forms. Videos use native browser controls and byte-range streaming; a media asset is served publicly only while linked to active published content. Unattached assets require a valid admin session. Referenced files cannot be deleted.
+## Documentation
 
-Create or edit floor plans under **Admin → Floor plans** after uploading a plan image. Use **Positions** to place or drag equipment. Marker coordinates are ratios relative to the displayed image, so locations scale with its rendered size. Members see the relevant floor plan directly on each exercise page. The API matches exercise equipment-type relationships to the gym's active physical units, then highlights only those units that have floor markers. If no matching location is mapped, the page shows available plans without unrelated highlights and explains that no specific location is configured. Archived plans, equipment units and equipment types are omitted from member locations.
+- [Documentation index](docs/README.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Installation](docs/INSTALLATION.md)
+- [Windows deployment](docs/DEPLOYMENT-WINDOWS.md)
+- [Database](docs/DATABASE.md)
+- [API](docs/API.md)
+- [Admin guide](docs/ADMIN-GUIDE.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Security](docs/SECURITY.md)
+- [Releasing](docs/RELEASING.md)
+- [Detailed Windows operations guide](deployment/windows/README.md)
 
-Member browsing returns to `/` after the configured idle period (60 seconds by default). Pointer/touch, keyboard and scroll gestures reset the timer; application-generated events do not. Actively playing video defers a timeout until playback ends, while pause or playback errors release a pending reset. Admin routes are excluded from this timer. Staff can change the setting under **Admin → Gym settings**; allowed values are whole seconds from 15 to 600.
+## License
 
-Back up MongoDB together with the complete media directory to preserve their references. The media directory can be configured independently of the source tree for Windows deployment.
+No license file is currently present in this repository. All rights are reserved unless the project owner specifies otherwise.

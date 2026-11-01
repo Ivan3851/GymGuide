@@ -13,4 +13,5 @@ export const getExercise = (id) => getJson(`/api/v1/exercises/${encodeURICompone
 export const getExerciseVariations = (id) =>
   getJson(`/api/v1/exercises/${encodeURIComponent(id)}/variations`)
 
-export const getGymMapFloorPlans = () => getJson('/api/v1/floor-plans?includeUnavailable=true')
+export const getGymMapFloorPlans = () =>
+  getJson('/api/v1/floor-plans?includeUnavailable=true&includeMissingImages=true')

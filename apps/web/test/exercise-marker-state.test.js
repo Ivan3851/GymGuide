@@ -5,7 +5,7 @@ import { exerciseMarkerClasses } from '../src/components/exercise/exercise-marke
 import { fileURLToPath } from 'node:url'
 
 const componentPath = fileURLToPath(
-  new URL('../src/components/exercise/ExerciseFloorPlan.vue', import.meta.url),
+  new URL('../src/components/floor-plan/FloorPlanCanvas.vue', import.meta.url),
 )
 const stylesPath = fileURLToPath(new URL('../src/styles/redesign.css', import.meta.url))
 const baseStylesPath = fileURLToPath(new URL('../src/styles/main.css', import.meta.url))
@@ -37,8 +37,8 @@ test('marks only the selected physical machine as selected', () => {
 
 test('uses accessible dot buttons without permanent map labels', async () => {
   const component = await readFile(componentPath, 'utf8')
-  assert.match(component, /:aria-label="[\s\S]*?marker\.gymEquipment\.displayName/)
-  assert.match(component, /@click="selectedEquipmentId = marker\.gymEquipment\.id"/)
+  assert.match(component, /:aria-label="label\(marker\)"/)
+  assert.match(component, /@click="emit\('select-marker', marker\.gymEquipment\.id\)"/)
   assert.doesNotMatch(component, /\{\{\s*marker\.gymEquipment\.displayName\s*\}\}/)
   assert.match(component, /marker\.x \* 100/)
   assert.match(component, /marker\.y \* 100/)
@@ -60,4 +60,19 @@ test('keeps the map and info panel side by side on large displays and stacked on
     /\.exercise-map-marker::before\s*\{[\s\S]*?width: 17px;[\s\S]*?height: 17px;/,
   )
   assert.match(baseStyles, /\.exercise-map-marker\s*\{[\s\S]*?width: var\(--touch-target\)/)
+})
+
+test('removes marker root fills and shadows while retaining the transparent touch target', async () => {
+  const styles = await readFile(stylesPath, 'utf8')
+  const baseStyles = await readFile(baseStylesPath, 'utf8')
+  const markerRule = styles.match(/\.exercise-map-marker\s*\{([^}]*)\}/)?.[1] || ''
+  const matchRule = styles.match(/\.exercise-map-marker-match\s*\{([^}]*)\}/)?.[1] || ''
+  assert.doesNotMatch(markerRule, /border: 3px solid var\(--color-bg\)/)
+  assert.doesNotMatch(markerRule, /background: var\(--color-text\)/)
+  assert.doesNotMatch(markerRule, /box-shadow:/)
+  assert.doesNotMatch(matchRule, /background: var\(--color-accent\)|box-shadow:/)
+  assert.match(
+    baseStyles,
+    /\.exercise-map-marker\s*\{[\s\S]*?width: var\(--touch-target\);[\s\S]*?height: var\(--touch-target\);[\s\S]*?background: transparent/,
+  )
 })

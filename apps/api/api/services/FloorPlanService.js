@@ -74,16 +74,20 @@ async function markersForPlan(db, floorPlan, includeArchived = false, includeUna
   })
 }
 
-async function floorPlanDetails(db, plan, includeUnavailable = false) {
+async function floorPlanDetails(
+  db,
+  plan,
+  { includeUnavailable = false, includeMissingImages = false } = {},
+) {
   const imageRecord = await db.collection('mediaAssets').findOne({
     _id: plan.imageMediaId,
     status: 'ready',
     mediaType: 'image',
   })
-  if (!imageRecord) return null
+  if (!imageRecord && !includeMissingImages) return null
   return {
     ...toPublic(plan),
-    image: MediaService.publicAsset(imageRecord),
+    image: imageRecord ? MediaService.publicAsset(imageRecord) : null,
     markers: await markersForPlan(db, plan, false, includeUnavailable),
   }
 }
@@ -112,7 +116,7 @@ module.exports = {
   listMemberFloorPlans: async function listMemberFloorPlans(
     sailsInstance,
     gymId = process.env.GYMGUIDE_GYM_ID || 'demo-gym',
-    { includeUnavailable = false } = {},
+    options = {},
   ) {
     const db = database(sailsInstance)
     const plans = await db
@@ -120,9 +124,7 @@ module.exports = {
       .find({ gymId, isActive: true })
       .sort({ sortOrder: 1, floorLabel: 1, name: 1 })
       .toArray()
-    const results = await Promise.all(
-      plans.map((plan) => floorPlanDetails(db, plan, includeUnavailable)),
-    )
+    const results = await Promise.all(plans.map((plan) => floorPlanDetails(db, plan, options)))
     return results.filter(Boolean)
   },
 

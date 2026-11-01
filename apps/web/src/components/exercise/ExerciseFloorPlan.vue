@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { exerciseMarkerClasses } from './exercise-marker-state.js'
+import FloorPlanCanvas from '@/components/floor-plan/FloorPlanCanvas.vue'
 import { localizeEquipmentUnit } from '@/localization/demo-content'
 import { useLocale } from '@/localization/locale'
 
@@ -86,28 +86,19 @@ watch(selectedFloorId, (floorId) => {
       </p>
       <p v-else class="floorplan-notice">{{ t('floor.noMatch') }}</p>
       <div class="exercise-floorplan-layout">
-        <div class="exercise-map-frame">
-          <div v-if="currentFloor" class="exercise-map">
-            <img
-              :src="currentFloor.image.contentUrl"
-              :alt="`${currentFloor.name} · ${t('floor.title')}`"
-            />
-            <button
-              v-for="marker in currentMarkers"
-              :key="marker.id"
-              class="exercise-map-marker"
-              :class="exerciseMarkerClasses(marker, selectedEquipmentId)"
-              :style="{ left: `${marker.x * 100}%`, top: `${marker.y * 100}%` }"
-              :aria-label="
-                marker.matchesExercise
-                  ? t('floor.markerMatch', { name: marker.gymEquipment.displayName })
-                  : marker.gymEquipment.displayName
-              "
-              :aria-pressed="selectedEquipmentId === marker.gymEquipment.id"
-              @click="selectedEquipmentId = marker.gymEquipment.id"
-            ></button>
-          </div>
-        </div>
+        <FloorPlanCanvas
+          v-if="currentFloor"
+          :floor="{ ...currentFloor, markers: currentMarkers }"
+          :selected-equipment-id="selectedEquipmentId"
+          :image-label="t('floor.title')"
+          :marker-label="
+            (marker) =>
+              marker.matchesExercise
+                ? t('floor.markerMatch', { name: marker.gymEquipment.displayName })
+                : marker.gymEquipment.displayName
+          "
+          @select-marker="selectedEquipmentId = $event"
+        />
 
         <aside class="exercise-equipment-panel" :aria-label="t('floor.equipmentLocations')">
           <h3>{{ currentMarker?.gymEquipment.displayName || t('floor.equipmentLocations') }}</h3>

@@ -522,15 +522,7 @@ textarea:focus-visible {
 .exercise-map-marker {
   width: var(--touch-target);
   height: var(--touch-target);
-  border: 3px solid var(--color-bg);
-  background: var(--color-text);
-  box-shadow: 0 0 0 2px var(--color-text);
   color: #ffffff;
-}
-
-.exercise-map-marker-match {
-  background: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent);
 }
 
 .exercise-map-marker-selected {
@@ -744,64 +736,28 @@ textarea:focus-visible {
 }
 
 .gym-map-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.65fr);
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 18px;
 }
 
 .gym-map-canvas {
-  position: relative;
   width: 100%;
   min-height: 240px;
-  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  line-height: 0;
+  box-sizing: border-box;
 }
 
-.gym-map-canvas img {
-  display: block;
-  width: 100%;
-  max-height: 76vh;
-  object-fit: contain;
-}
-
-.gym-map-marker {
-  position: absolute;
-  z-index: 1;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  transform: translate(-50%, -50%);
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-}
-
-.gym-map-marker::before {
-  position: absolute;
-  inset: 15px;
-  border: 2px solid #fff;
-  border-radius: 50%;
+.gym-floor-map-marker::before {
   background: var(--color-accent);
-  box-shadow: 0 2px 8px rgb(35 35 35 / 55%);
-  content: '';
-}
-
-.gym-map-marker-selected::before {
-  inset: 14px;
-  border: 3px solid #fff;
-  background: var(--color-accent);
-  box-shadow:
-    0 0 0 2px var(--color-text),
-    0 2px 8px rgb(35 35 35 / 55%);
 }
 
 .gym-map-info {
   display: grid;
+  width: 100%;
   min-width: 0;
   gap: 10px;
   padding: 20px;
@@ -1150,18 +1106,6 @@ textarea:focus-visible {
 
   .admin-resource-workspace {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .gym-map-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .gym-map-info {
-    order: 1;
-  }
-
-  .gym-map-canvas {
-    order: 0;
   }
 
   .admin-shell {

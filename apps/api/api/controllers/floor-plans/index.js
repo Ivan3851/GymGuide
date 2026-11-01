@@ -6,6 +6,7 @@ module.exports = async function listFloorPlans(req, res) {
     return res.json({
       data: await floorPlans.listMemberFloorPlans(req._sails, undefined, {
         includeUnavailable: req.query.includeUnavailable === 'true',
+        includeMissingImages: req.query.includeMissingImages === 'true',
       }),
     })
   } catch (error) {
