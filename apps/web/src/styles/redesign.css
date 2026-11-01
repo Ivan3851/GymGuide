@@ -1639,3 +1639,13 @@ textarea:focus-visible {
     padding: 10px;
   }
 }
+
+@media (max-width: 899.98px) {
+  .admin-sidebar {
+    min-height: 0;
+  }
+
+  .admin-sidebar-footer {
+    margin-top: 8px;
+  }
+}

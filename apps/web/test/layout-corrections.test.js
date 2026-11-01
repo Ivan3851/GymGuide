@@ -58,4 +58,8 @@ test('sidebar logout remains in a route-independent flex column and at the botto
     shell,
     /<nav[\s\S]*?<\/nav>[\s\S]*?class="admin-sidebar-footer"[\s\S]*?admin\.logout/,
   )
+  assert.match(
+    styles,
+    /@media \(max-width: 899\.98px\)[\s\S]*?\.admin-sidebar\s*\{[^}]*min-height: 0;[\s\S]*?\.admin-sidebar-footer\s*\{[^}]*margin-top: 8px;/,
+  )
 })
