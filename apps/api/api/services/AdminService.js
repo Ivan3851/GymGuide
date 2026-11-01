@@ -1,17 +1,18 @@
 const crypto = require('crypto')
 const ApiError = require('./ApiError')
 const mediaReferenceLock = require('./MediaReferenceLock')
+const BilingualContent = require('./BilingualContent')
 
 const resources = {
   'muscle-groups': {
     collection: 'muscleGroups',
-    fields: ['slug', 'name', 'description', 'sortOrder'],
+    fields: ['slug', 'name', 'description', 'translations', 'sortOrder'],
     required: ['name', 'description'],
     label: 'muscle group',
   },
   'equipment-types': {
     collection: 'equipmentTypes',
-    fields: ['slug', 'name', 'description', 'sortOrder'],
+    fields: ['slug', 'name', 'description', 'translations', 'sortOrder'],
     required: ['name', 'description'],
     label: 'equipment type',
   },
@@ -31,6 +32,7 @@ const resources = {
       'benefits',
       'tips',
       'commonMistakes',
+      'translations',
       'videoMediaId',
       'imageMediaIds',
       'sortOrder',
@@ -40,7 +42,15 @@ const resources = {
   },
   variations: {
     collection: 'exerciseVariations',
-    fields: ['slug', 'exerciseId', 'name', 'description', 'instructions', 'sortOrder'],
+    fields: [
+      'slug',
+      'exerciseId',
+      'name',
+      'description',
+      'instructions',
+      'translations',
+      'sortOrder',
+    ],
     required: ['exerciseId', 'name', 'description'],
     label: 'exercise variation',
   },
@@ -76,6 +86,10 @@ const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 120)
+function createContentSlug(input, resource, fallbackName) {
+  const slug = slugify(input.slug || input.translations?.en?.name || fallbackName)
+  return slug || `${resource}-${crypto.randomUUID()}`
+}
 function definition(resource) {
   const item = resources[resource]
   if (!item) throw ApiError.notFound('Admin resource not found.')
@@ -231,6 +245,34 @@ module.exports = {
       throw ApiError.badRequest('A JSON object is required.')
     const data = {}
     for (const field of item.fields) if (Object.hasOwn(input, field)) data[field] = input[field]
+    const existing = id
+      ? await db.collection(item.collection).findOne({
+          _id: id,
+          ...(['gym-equipment', 'floor-plans'].includes(resource) ? { gymId: user.gymId } : {}),
+        })
+      : null
+    if (id && !existing) throw ApiError.notFound(`${item.label} not found.`)
+    let localized = BilingualContent.normalizeForStorage(
+      resource,
+      data.translations,
+      data,
+      existing,
+    )
+    if (!localized && existing?.translations && BilingualContent.schemas[resource]) {
+      const legacyTranslations = {
+        'mk-MK': { ...(existing.translations['mk-MK'] || {}) },
+        en: { ...(existing.translations.en || {}) },
+      }
+      for (const field of Object.keys(BilingualContent.schemas[resource])) {
+        if (Object.hasOwn(data, field)) {
+          legacyTranslations['mk-MK'][field] = data[field]
+          legacyTranslations.en[field] = data[field]
+        }
+      }
+      localized = BilingualContent.normalizeForStorage(resource, legacyTranslations, data, existing)
+    }
+    if (localized)
+      Object.assign(data, localized.canonical, { translations: localized.translations })
     for (const field of item.required)
       if (id && !Object.hasOwn(data, field)) continue
       else
@@ -249,7 +291,7 @@ module.exports = {
     if (resource !== 'gym-equipment' && resource !== 'variations') {
       if (data.sortOrder === undefined && !id) data.sortOrder = 0
       validateOrder(data.sortOrder)
-      if (!id) data.slug = slugify(input.slug || data.name)
+      if (!id) data.slug = createContentSlug(input, resource, data.name)
       if (
         data.slug !== undefined &&
         (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.slug) || data.slug.length > 120)
@@ -285,7 +327,7 @@ module.exports = {
         validateList(data[field], label, !id)
       if (data.sortOrder === undefined && !id) data.sortOrder = 0
       validateOrder(data.sortOrder)
-      if (!id) data.slug = slugify(input.slug || data.name)
+      if (!id) data.slug = createContentSlug(input, resource, data.name)
       if (data.slug !== undefined && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.slug))
         throw ApiError.badRequest('Exercise name must produce a valid slug.')
     }
@@ -301,11 +343,6 @@ module.exports = {
         throw ApiError.badRequest('Variation name must produce a valid slug.')
     }
     if (id) {
-      const existing = await db.collection(item.collection).findOne({
-        _id: id,
-        ...(['gym-equipment', 'floor-plans'].includes(resource) ? { gymId: user.gymId } : {}),
-      })
-      if (!existing) throw ApiError.notFound(`${item.label} not found.`)
       if (resource === 'gym-equipment') data.gymId = user.gymId
       if (resource === 'exercises') {
         data.slug = existing.slug

@@ -1,12 +1,15 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { getAdminSettings, updateAdminSettings } from '@/api/admin'
+import { useLocale } from '@/localization/locale'
+import { apiErrorMessageKey } from '@/localization/api-error'
 
 const timeoutSeconds = ref(60)
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const notice = ref('')
+const { t } = useLocale()
 
 async function load() {
   loading.value = true
@@ -15,7 +18,7 @@ async function load() {
     const settings = await getAdminSettings()
     timeoutSeconds.value = settings.memberInactivityTimeoutSeconds
   } catch (problem) {
-    error.value = problem.message
+    error.value = apiErrorMessageKey(problem)
   } finally {
     loading.value = false
   }
@@ -29,9 +32,9 @@ async function save() {
       memberInactivityTimeoutSeconds: Number(timeoutSeconds.value),
     })
     timeoutSeconds.value = settings.memberInactivityTimeoutSeconds
-    notice.value = 'Kiosk settings saved.'
+    notice.value = 'admin.settingsSaved'
   } catch (problem) {
-    error.value = problem.message
+    error.value = apiErrorMessageKey(problem)
   } finally {
     saving.value = false
   }
@@ -43,20 +46,17 @@ onMounted(load)
   <section>
     <div class="admin-page-heading">
       <div>
-        <p class="admin-eyebrow">Kiosk configuration</p>
-        <h1>Gym settings</h1>
-        <p class="admin-muted">These settings apply to member browsing at this gym.</p>
+        <p class="admin-eyebrow">{{ t('admin.settingsEyebrow') }}</p>
+        <h1>{{ t('admin.settingsTitle') }}</h1>
+        <p class="admin-muted">{{ t('admin.settingsDescription') }}</p>
       </div>
     </div>
-    <p v-if="error" class="admin-alert" role="alert">{{ error }}</p>
-    <p v-if="notice" class="admin-success" role="status">{{ notice }}</p>
+    <p v-if="error" class="admin-alert" role="alert">{{ t(error) }}</p>
+    <p v-if="notice" class="admin-success" role="status">{{ t(notice) }}</p>
     <form class="admin-panel gym-settings-form" @submit.prevent="save">
       <label>
-        Return to homepage after inactivity
-        <span
-          >Members return to the start after this many idle seconds. Active videos are allowed to
-          finish.</span
-        >
+        {{ t('admin.idleTimeout') }}
+        <span>{{ t('admin.idleExplanation') }}</span>
         <input
           v-model.number="timeoutSeconds"
           type="number"
@@ -67,9 +67,9 @@ onMounted(load)
           :disabled="loading"
         />
       </label>
-      <p class="admin-muted">Allowed range: 15–600 seconds. Default: 60 seconds.</p>
+      <p class="admin-muted">{{ t('admin.timeoutRange') }}</p>
       <button class="admin-button admin-button-primary" :disabled="loading || saving">
-        {{ saving ? 'Saving…' : 'Save settings' }}
+        {{ saving ? t('admin.saving') : t('admin.saveSettings') }}
       </button>
     </form>
   </section>

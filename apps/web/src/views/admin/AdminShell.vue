@@ -2,20 +2,21 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAdminSession, signOut } from '@/api/admin'
+import { adminContentResources, adminContentResourcePath } from '@/admin/admin-content-resources'
+import { useLocale } from '@/localization/locale'
 
 const user = ref(null)
 const router = useRouter()
+const { t } = useLocale()
 const links = [
-  { label: 'Dashboard', to: '/admin/dashboard' },
-  { label: 'Muscle groups', to: '/admin/content/muscle-groups' },
-  { label: 'Equipment types', to: '/admin/content/equipment-types' },
-  { label: 'Gym equipment', to: '/admin/content/gym-equipment' },
-  { label: 'Exercises', to: '/admin/content/exercises' },
-  { label: 'Variations', to: '/admin/content/variations' },
-  { label: 'Floor plans', to: '/admin/content/floor-plans' },
-  { label: 'Positions', to: '/admin/floor-plans/edit' },
-  { label: 'Media library', to: '/admin/media' },
-  { label: 'Gym settings', to: '/admin/settings' },
+  { label: 'admin.dashboard', to: '/admin/dashboard' },
+  ...Object.entries(adminContentResources).map(([resource, label]) => ({
+    label,
+    to: adminContentResourcePath(resource),
+  })),
+  { label: 'admin.positions', to: '/admin/floor-plans/edit' },
+  { label: 'admin.media', to: '/admin/media' },
+  { label: 'admin.settings', to: '/admin/settings' },
 ]
 
 onMounted(async () => {
@@ -35,19 +36,25 @@ async function logout() {
 <template>
   <div class="admin-shell">
     <aside class="admin-sidebar">
-      <RouterLink class="admin-brand" to="/admin/dashboard">GymGuide <span>ADMIN</span></RouterLink>
-      <nav aria-label="Administration">
-        <RouterLink v-for="link in links" :key="link.to" :to="link.to" class="admin-nav-link">{{
-          link.label
-        }}</RouterLink>
+      <RouterLink class="admin-brand" to="/admin/dashboard">
+        <span class="admin-brand-name">GymGuide</span><span>{{ t('admin.badge') }}</span>
+      </RouterLink>
+      <nav :aria-label="t('admin.navigation')">
+        <RouterLink v-for="link in links" :key="link.to" :to="link.to" class="admin-nav-link">
+          {{ t(link.label) }}
+        </RouterLink>
       </nav>
       <div class="admin-sidebar-footer">
         <div class="admin-user">
           <strong>{{ user?.username || 'Admin' }}</strong
-          ><span>{{ user?.role || 'Gym staff' }}</span>
+          ><span>{{
+            user?.role === 'gym-admin' ? t('admin.roleAdmin') : t('admin.roleStaff')
+          }}</span>
         </div>
-        <button class="admin-button admin-button-quiet" @click="logout">Log out</button>
-        <RouterLink class="admin-return-link" to="/">Return to member kiosk ↗</RouterLink>
+        <RouterLink class="admin-return-link" to="/">{{ t('admin.return') }} ↗</RouterLink>
+        <button class="admin-button admin-button-quiet" @click="logout">
+          {{ t('admin.logout') }}
+        </button>
       </div>
     </aside>
     <main class="admin-main"><RouterView /></main>

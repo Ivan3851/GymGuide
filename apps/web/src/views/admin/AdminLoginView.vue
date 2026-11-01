@@ -1,7 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { AdminApiError, signIn } from '@/api/admin'
+import { signIn } from '@/api/admin'
+import { useLocale } from '@/localization/locale'
 
 const username = ref('')
 const password = ref('')
@@ -9,6 +10,15 @@ const error = ref('')
 const pending = ref(false)
 const router = useRouter()
 const route = useRoute()
+const { t } = useLocale()
+
+function setValidation(event, key) {
+  event.target.setCustomValidity(t(key))
+}
+
+function clearValidation(event) {
+  event.target.setCustomValidity('')
+}
 
 async function submit() {
   pending.value = true
@@ -20,9 +30,8 @@ async function submit() {
         ? route.query.redirect
         : '/admin/dashboard'
     await router.replace(redirect)
-  } catch (requestError) {
-    error.value =
-      requestError instanceof AdminApiError ? requestError.message : 'Could not sign in. Try again.'
+  } catch {
+    error.value = 'admin.loginError'
   } finally {
     pending.value = false
   }
@@ -32,29 +41,39 @@ async function submit() {
 <template>
   <main class="admin-login-page">
     <form class="admin-login-card" @submit.prevent="submit">
-      <RouterLink class="admin-brand" to="/">GymGuide <span>STAFF</span></RouterLink>
-      <p class="admin-eyebrow">Administration</p>
-      <h1>Sign in</h1>
-      <p class="admin-muted">Use your gym staff account to manage this kiosk's content.</p>
+      <RouterLink class="admin-brand" to="/"
+        >GymGuide <span>{{ t('admin.badge') }}</span></RouterLink
+      >
+      <p class="admin-eyebrow">{{ t('admin.loginEyebrow') }}</p>
+      <h1>{{ t('admin.loginTitle') }}</h1>
+      <p class="admin-muted">{{ t('admin.loginDescription') }}</p>
       <label
-        >Username or email<input
+        >{{ t('admin.username')
+        }}<input
           v-model="username"
           autocomplete="username"
           required
           maxlength="254"
           autofocus
+          :aria-label="t('admin.username')"
+          @invalid="setValidation($event, 'admin.validation.username')"
+          @input="clearValidation"
       /></label>
       <label
-        >Password<input
+        >{{ t('admin.password')
+        }}<input
           v-model="password"
           type="password"
           autocomplete="current-password"
           required
           maxlength="256"
+          :aria-label="t('admin.password')"
+          @invalid="setValidation($event, 'admin.validation.password')"
+          @input="clearValidation"
       /></label>
-      <p v-if="error" class="admin-alert" role="alert">{{ error }}</p>
+      <p v-if="error" class="admin-alert" role="alert">{{ t(error) }}</p>
       <button class="admin-button admin-button-primary" type="submit" :disabled="pending">
-        {{ pending ? 'Signing in…' : 'Sign in' }}
+        {{ pending ? t('admin.signingIn') : t('admin.signIn') }}
       </button>
     </form>
   </main>

@@ -9,6 +9,7 @@ module.exports = {
     benefits: { type: 'json', required: true },
     tips: { type: 'json', required: true },
     commonMistakes: { type: 'json', required: true },
+    translations: { type: 'json', defaultsTo: {} },
     sortOrder: { type: 'number', required: true, min: 0 },
     videoMediaId: { type: 'string', allowNull: true },
     imageMediaIds: { type: 'json', defaultsTo: [] },

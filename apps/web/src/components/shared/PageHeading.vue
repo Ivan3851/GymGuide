@@ -1,9 +1,13 @@
 <script setup>
+import { useLocale } from '@/localization/locale'
+
+const { t } = useLocale()
+
 defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
   backTo: { type: [String, Object], default: '/' },
-  backLabel: { type: String, default: 'Back' },
+  backLabel: { type: String, default: '' },
 })
 </script>
 
@@ -11,9 +15,9 @@ defineProps({
   <section class="page-heading">
     <RouterLink class="back-link" :to="backTo">
       <span aria-hidden="true">←</span>
-      {{ backLabel }}
+      {{ backLabel || t('common.back') }}
     </RouterLink>
-    <p class="eyebrow">GymGuide demo</p>
+    <p class="eyebrow">{{ t('common.demo') }}</p>
     <h1>{{ title }}</h1>
     <p v-if="description" class="page-description">{{ description }}</p>
   </section>

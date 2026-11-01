@@ -7,6 +7,7 @@ module.exports = {
     name: { type: 'string', required: true, minLength: 1, maxLength: 160 },
     description: { type: 'string', required: true, maxLength: 500 },
     instructions: { type: 'json', required: true },
+    translations: { type: 'json', defaultsTo: {} },
     sortOrder: { type: 'number', required: true, min: 0 },
     isActive: { type: 'boolean', defaultsTo: true },
     isDemo: { type: 'boolean', defaultsTo: false },

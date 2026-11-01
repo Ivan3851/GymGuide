@@ -77,8 +77,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-shell">
-    <AppHeader />
-    <main class="main-content">
+    <AppHeader v-if="!isAdminRoute(route.path)" />
+    <main class="main-content" :class="{ 'main-content-admin': isAdminRoute(route.path) }">
       <RouterView />
     </main>
   </div>

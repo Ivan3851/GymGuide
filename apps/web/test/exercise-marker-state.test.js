@@ -7,9 +7,10 @@ import { fileURLToPath } from 'node:url'
 const componentPath = fileURLToPath(
   new URL('../src/components/exercise/ExerciseFloorPlan.vue', import.meta.url),
 )
-const stylesPath = fileURLToPath(new URL('../src/styles/main.css', import.meta.url))
+const stylesPath = fileURLToPath(new URL('../src/styles/redesign.css', import.meta.url))
+const baseStylesPath = fileURLToPath(new URL('../src/styles/main.css', import.meta.url))
 
-test('marks every matching machine red and unrelated machine green', () => {
+test('keeps matching and unrelated machine marker states distinct', () => {
   assert.deepEqual(
     exerciseMarkerClasses({ matchesExercise: true, gymEquipment: { id: 'unit-a' } }, ''),
     {
@@ -36,7 +37,7 @@ test('marks only the selected physical machine as selected', () => {
 
 test('uses accessible dot buttons without permanent map labels', async () => {
   const component = await readFile(componentPath, 'utf8')
-  assert.match(component, /:aria-label=".*marker\.gymEquipment\.displayName/)
+  assert.match(component, /:aria-label="[\s\S]*?marker\.gymEquipment\.displayName/)
   assert.match(component, /@click="selectedEquipmentId = marker\.gymEquipment\.id"/)
   assert.doesNotMatch(component, /\{\{\s*marker\.gymEquipment\.displayName\s*\}\}/)
   assert.match(component, /marker\.x \* 100/)
@@ -45,16 +46,18 @@ test('uses accessible dot buttons without permanent map labels', async () => {
 
 test('keeps the map and info panel side by side on large displays and stacked on smaller ones', async () => {
   const styles = await readFile(stylesPath, 'utf8')
+  const baseStyles = await readFile(baseStylesPath, 'utf8')
   assert.match(
-    styles,
+    baseStyles,
     /@media \(min-width: 1100px\)[\s\S]*?\.exercise-floorplan-layout\s*\{[\s\S]*?minmax\(250px, 320px\)/,
   )
   assert.match(
     styles,
-    /@media \(max-width: 820px\)[\s\S]*?\.exercise-floorplan-layout\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/,
+    /@media \(max-width: 900px\)[\s\S]*?\.exercise-floorplan-layout\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/,
   )
   assert.match(
     styles,
-    /\.exercise-map-marker::before\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,
+    /\.exercise-map-marker::before\s*\{[\s\S]*?width: 17px;[\s\S]*?height: 17px;/,
   )
+  assert.match(baseStyles, /\.exercise-map-marker\s*\{[\s\S]*?width: var\(--touch-target\)/)
 })

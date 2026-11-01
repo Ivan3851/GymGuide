@@ -1,8 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { exerciseMarkerClasses } from './exercise-marker-state.js'
+import { localizeEquipmentUnit } from '@/localization/demo-content'
+import { useLocale } from '@/localization/locale'
 
 const props = defineProps({ locations: { type: Object, required: true } })
+const { locale, t } = useLocale()
 const selectedFloorId = ref('')
 const selectedEquipmentId = ref('')
 const currentFloor = computed(
@@ -11,12 +14,22 @@ const currentFloor = computed(
     props.locations.floorPlans[0] ||
     null,
 )
+const currentMarkers = computed(
+  () =>
+    currentFloor.value?.markers.map((marker) => ({
+      ...marker,
+      gymEquipment: localizeEquipmentUnit(marker.gymEquipment, locale.value),
+    })) || [],
+)
 const currentMarker = computed(
   () =>
-    currentFloor.value?.markers.find(
-      (marker) => marker.gymEquipment.id === selectedEquipmentId.value,
-    ) || null,
+    currentMarkers.value.find((marker) => marker.gymEquipment.id === selectedEquipmentId.value) ||
+    null,
 )
+const equipmentUnits = computed(() =>
+  props.locations.equipmentUnits.map((unit) => localizeEquipmentUnit(unit, locale.value)),
+)
+
 function selectEquipment(equipmentId) {
   selectedEquipmentId.value = equipmentId
   const floor = props.locations.floorPlans.find((item) =>
@@ -51,11 +64,11 @@ watch(selectedFloorId, (floorId) => {
   <section class="detail-section exercise-floorplan-section">
     <div class="floorplan-heading">
       <div>
-        <p class="eyebrow">At your gym</p>
-        <h2>Find this equipment</h2>
+        <p class="eyebrow">{{ t('floor.eyebrow') }}</p>
+        <h2>{{ t('floor.title') }}</h2>
       </div>
       <label v-if="locations.floorPlans.length > 1" class="floorplan-floor-select">
-        Floor
+        {{ t('floor.floor') }}
         <select v-model="selectedFloorId">
           <option v-for="floor in locations.floorPlans" :key="floor.id" :value="floor.id">
             {{ floor.floorLabel }} · {{ floor.name }}
@@ -65,48 +78,50 @@ watch(selectedFloorId, (floorId) => {
     </div>
 
     <p v-if="!locations.floorPlans.length" class="floorplan-notice">
-      This gym has not added a floor plan yet. Ask a staff member where to find the equipment.
+      {{ t('floor.none') }}
     </p>
     <template v-else>
       <p v-if="locations.hasMappedEquipment" class="floorplan-notice">
-        Highlighted markers show equipment that can perform this exercise.
+        {{ t('floor.highlighted') }}
       </p>
-      <p v-else class="floorplan-notice">
-        No specific machine location has been configured for this exercise. The floor plan is shown
-        for reference.
-      </p>
+      <p v-else class="floorplan-notice">{{ t('floor.noMatch') }}</p>
       <div class="exercise-floorplan-layout">
         <div class="exercise-map-frame">
           <div v-if="currentFloor" class="exercise-map">
-            <img :src="currentFloor.image.contentUrl" :alt="`${currentFloor.name} floor plan`" />
+            <img
+              :src="currentFloor.image.contentUrl"
+              :alt="`${currentFloor.name} · ${t('floor.title')}`"
+            />
             <button
-              v-for="marker in currentFloor.markers"
+              v-for="marker in currentMarkers"
               :key="marker.id"
               class="exercise-map-marker"
               :class="exerciseMarkerClasses(marker, selectedEquipmentId)"
               :style="{ left: `${marker.x * 100}%`, top: `${marker.y * 100}%` }"
-              :aria-label="`${marker.gymEquipment.displayName}${marker.matchesExercise ? ', matches this exercise' : ''}`"
+              :aria-label="
+                marker.matchesExercise
+                  ? t('floor.markerMatch', { name: marker.gymEquipment.displayName })
+                  : marker.gymEquipment.displayName
+              "
               :aria-pressed="selectedEquipmentId === marker.gymEquipment.id"
               @click="selectedEquipmentId = marker.gymEquipment.id"
             ></button>
           </div>
         </div>
 
-        <aside class="exercise-equipment-panel" aria-label="Equipment locations">
-          <h3>{{ currentMarker?.gymEquipment.displayName || 'Equipment locations' }}</h3>
+        <aside class="exercise-equipment-panel" :aria-label="t('floor.equipmentLocations')">
+          <h3>{{ currentMarker?.gymEquipment.displayName || t('floor.equipmentLocations') }}</h3>
           <p v-if="currentMarker">
             {{ currentMarker.gymEquipment.equipmentTypeName
             }}<span v-if="currentMarker.gymEquipment.details">
               · {{ currentMarker.gymEquipment.details }}</span
             >
           </p>
-          <p v-else-if="selectedEquipmentId">
-            No floor marker is configured for this equipment unit.
-          </p>
-          <p v-else>Select an equipment marker to see its name and details.</p>
-          <h4 v-if="locations.equipmentUnits.length">Matching equipment</h4>
+          <p v-else-if="selectedEquipmentId">{{ t('floor.noMarker') }}</p>
+          <p v-else>{{ t('floor.selectMarker') }}</p>
+          <h4 v-if="locations.equipmentUnits.length">{{ t('floor.matchingEquipment') }}</h4>
           <button
-            v-for="unit in locations.equipmentUnits"
+            v-for="unit in equipmentUnits"
             :key="unit.id"
             class="equipment-location-choice"
             :class="{ 'equipment-location-choice-selected': selectedEquipmentId === unit.id }"

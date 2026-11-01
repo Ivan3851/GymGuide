@@ -55,4 +55,5 @@ module.exports.routes = {
   'GET /muscle-groups/*': { action: 'frontend/index', skipAssets: true },
   'GET /equipment/*': { action: 'frontend/index', skipAssets: true },
   'GET /exercises/*': { action: 'frontend/index', skipAssets: true },
+  'GET /map': { action: 'frontend/index', skipAssets: true },
 }

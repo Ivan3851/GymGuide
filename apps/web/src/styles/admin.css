@@ -69,7 +69,7 @@
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: #121914;
+  background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
 }
@@ -99,11 +99,11 @@
 .admin-button-primary {
   border-color: var(--color-accent);
   background: var(--color-accent);
-  color: #182014;
+  color: var(--color-accent-ink);
 }
 .admin-button-danger {
-  border-color: rgb(226 128 105 / 35%);
-  color: #f0a08d;
+  border-color: var(--color-border);
+  color: var(--color-text);
 }
 .admin-button-quiet {
   min-height: 38px;
@@ -115,17 +115,17 @@
 }
 .admin-alert,
 .admin-success {
-  border: 1px solid rgb(226 128 105 / 35%);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 12px 14px;
-  background: rgb(226 128 105 / 8%);
-  color: #f2ad9c;
+  background: var(--color-surface);
+  color: var(--color-text);
   line-height: 1.5;
 }
 .admin-success {
-  border-color: rgb(164 209 117 / 35%);
-  background: rgb(164 209 117 / 8%);
-  color: var(--color-accent);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 .admin-shell {
   min-height: calc(100vh - 88px);
@@ -138,7 +138,7 @@
   gap: 30px;
   padding: 26px 16px;
   border-right: 1px solid var(--color-border);
-  background: rgb(12 17 14 / 65%);
+  background: var(--color-bg);
 }
 .admin-sidebar nav {
   display: grid;
@@ -157,7 +157,7 @@
 }
 .admin-nav-link:hover,
 .admin-nav-link.router-link-active {
-  background: rgb(164 209 117 / 10%);
+  background: rgb(255 201 71 / 12%);
   color: var(--color-accent);
 }
 .admin-sidebar-footer {
@@ -347,8 +347,8 @@
 .admin-status {
   padding: 4px 8px;
   border-radius: 99px;
-  background: rgb(164 209 117 / 10%);
-  color: var(--color-accent);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
@@ -478,7 +478,7 @@
 .editor-marker-selected {
   outline: 4px solid #fff;
   box-shadow:
-    0 0 0 8px rgb(164 209 117 / 45%),
+    0 0 0 8px rgb(255 201 71 / 35%),
     0 4px 18px #0008;
 }
 .floor-editor-selected-panel {
@@ -515,7 +515,7 @@
   padding: 9px 11px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #121914;
+  background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
 }

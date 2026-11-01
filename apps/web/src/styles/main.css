@@ -33,8 +33,7 @@ button {
 .app-shell {
   min-height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 78% 20%, rgb(130 184 85 / 8%), transparent 32rem), var(--color-bg);
+  background: var(--color-bg);
 }
 
 .app-header {
@@ -118,7 +117,7 @@ button {
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: #111713;
+  background: var(--color-surface);
 }
 .exercise-map {
   position: relative;
@@ -155,18 +154,18 @@ button {
   height: 22px;
   border: 2px solid #fff;
   border-radius: 50%;
-  background: #2f9e65;
+  background: #232323;
   box-shadow: 0 3px 12px #000b;
   content: '';
 }
 .exercise-map-marker-match {
-  --marker-color: #df4545;
+  --marker-color: #ffc947;
 }
 .exercise-map-marker-other {
-  --marker-color: #2f9e65;
+  --marker-color: #232323;
 }
 .exercise-map-marker::before {
-  background: var(--marker-color, #2f9e65);
+  background: var(--marker-color, #232323);
 }
 .exercise-map-marker-selected {
   z-index: 2;
@@ -185,7 +184,7 @@ button {
   padding: 18px;
   border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: rgb(255 255 255 / 3%);
+  background: var(--color-surface);
 }
 @media (min-width: 1100px) {
   .exercise-floorplan-layout {
@@ -228,7 +227,7 @@ button {
 }
 .equipment-location-choice-selected {
   border-color: var(--color-accent);
-  background: rgb(164 209 117 / 9%);
+  background: rgb(255 201 71 / 14%);
 }
 .floor-select {
   display: flex;
@@ -255,7 +254,7 @@ button {
   border: 2px solid #fff;
   border-radius: 99px;
   background: var(--color-accent);
-  color: #182014;
+  color: var(--color-accent-ink);
   font-size: 13px;
   font-weight: 800;
   box-shadow: 0 4px 18px #0008;
@@ -370,7 +369,7 @@ p {
   width: 68%;
   height: 68%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgb(143 200 92 / 20%), transparent 70%);
+  background: radial-gradient(circle, rgb(35 35 35 / 8%), transparent 70%);
   filter: blur(4px);
 }
 
@@ -378,14 +377,14 @@ p {
   position: absolute;
   width: 76%;
   height: 76%;
-  border: 1px solid rgb(206 228 188 / 13%);
+  border: 1px solid rgb(35 35 35 / 10%);
   border-radius: 50%;
 }
 
 .orbit-two {
   width: 57%;
   height: 57%;
-  border-color: rgb(206 228 188 / 10%);
+  border-color: rgb(35 35 35 / 8%);
 }
 
 .art-figure {
@@ -397,7 +396,7 @@ p {
 
 .art-figure circle,
 .art-figure path {
-  stroke: #d4e4c7;
+  stroke: #777777;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 8;
@@ -412,7 +411,7 @@ p {
   position: absolute;
   right: 0;
   bottom: 12%;
-  color: rgb(220 231 209 / 46%);
+  color: rgb(35 35 35 / 46%);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.2em;
@@ -436,9 +435,9 @@ p {
   height: 58px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid rgb(164 209 117 / 24%);
+  border: 1px solid rgb(35 35 35 / 14%);
   border-radius: 17px;
-  background: rgb(164 209 117 / 9%);
+  background: var(--color-surface-raised);
 }
 
 .selection-icon svg {
@@ -483,7 +482,7 @@ p {
 
 .button-primary {
   background: var(--color-accent);
-  color: #182014;
+  color: var(--color-accent-ink);
 }
 
 .button:disabled {
@@ -507,12 +506,12 @@ p {
   height: 7px;
   border-radius: 50%;
   background: var(--color-accent);
-  box-shadow: 0 0 12px rgb(164 209 117 / 56%);
+  box-shadow: 0 0 8px rgb(255 201 71 / 38%);
 }
 
 .status-dot-offline {
-  background: #e59b67;
-  box-shadow: 0 0 12px rgb(229 155 103 / 45%);
+  background: #777777;
+  box-shadow: none;
 }
 
 .hero-compact {
@@ -633,8 +632,8 @@ p {
 .selection-card:hover,
 .selection-card:focus-visible {
   transform: translateY(-2px);
-  border-color: rgb(164 209 117 / 55%);
-  background: rgb(164 209 117 / 8%);
+  border-color: var(--color-accent);
+  background: rgb(255 201 71 / 10%);
   outline: none;
 }
 
@@ -667,7 +666,7 @@ p {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 13px;
-  background: rgb(164 209 117 / 11%);
+  background: rgb(255 201 71 / 12%);
   color: var(--color-accent);
   font-size: 20px;
 }
@@ -695,7 +694,7 @@ p {
 }
 
 .state-panel-error {
-  border-color: rgb(229 155 103 / 35%);
+  border-color: var(--color-border);
 }
 
 .button-secondary {
@@ -723,10 +722,10 @@ p {
   align-content: center;
   justify-items: center;
   padding: 28px;
-  border: 1px dashed rgb(164 209 117 / 35%);
+  border: 1px dashed var(--color-border);
   border-radius: var(--radius-card);
   background:
-    radial-gradient(ellipse at center, rgb(164 209 117 / 8%), transparent 60%), var(--color-surface);
+    radial-gradient(ellipse at center, rgb(35 35 35 / 3%), transparent 60%), var(--color-surface);
   text-align: center;
 }
 
@@ -737,7 +736,7 @@ p {
   place-items: center;
   margin-bottom: 16px;
   padding-left: 4px;
-  border: 1px solid rgb(164 209 117 / 40%);
+  border: 1px solid var(--color-border);
   border-radius: 50%;
   color: var(--color-accent);
   font-size: 20px;
@@ -805,8 +804,8 @@ p {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 10px;
-  background: rgb(164 209 117 / 12%);
-  color: var(--color-accent);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
   font-size: 13px;
   font-weight: 800;
 }
@@ -832,10 +831,10 @@ p {
   min-height: 36px;
   align-items: center;
   padding: 0 12px;
-  border: 1px solid rgb(164 209 117 / 25%);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: rgb(164 209 117 / 8%);
-  color: var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: 13px;
   font-weight: 700;
 }
@@ -856,7 +855,7 @@ p {
 }
 
 .text-list li::marker {
-  color: var(--color-accent);
+  color: var(--color-text-muted);
 }
 
 .variation-list {

@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export function useAsyncData(loader) {
+export function useAsyncData(loader, formatError = (error) => error.message) {
   const data = ref(null)
   const isLoading = ref(true)
   const error = ref('')
@@ -15,7 +15,7 @@ export function useAsyncData(loader) {
       if (requestId === latestRequest) data.value = result
     } catch (loadError) {
       if (requestId === latestRequest) {
-        error.value = loadError.message || 'Something went wrong while loading GymGuide.'
+        error.value = formatError(loadError)
         data.value = null
       }
     } finally {

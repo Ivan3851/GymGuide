@@ -60,7 +60,7 @@ export async function signOut() {
   }
 }
 
-export const getAdmin = (path) => request(`/api/v1/admin/${path}`)
+export const getAdmin = (path, options = {}) => request(`/api/v1/admin/${path}`, options)
 export const getAdminSettings = () => request('/api/v1/admin/settings')
 export const updateAdminSettings = (payload) =>
   request('/api/v1/admin/settings', { method: 'PUT', body: JSON.stringify(payload) })

@@ -3,8 +3,10 @@ import EquipmentView from '@/views/EquipmentView.vue'
 import ExerciseView from '@/views/ExerciseView.vue'
 import HomeView from '@/views/HomeView.vue'
 import MuscleGroupView from '@/views/MuscleGroupView.vue'
+import GymMapView from '@/views/GymMapView.vue'
 import { adminRoutes } from './admin-views'
 import { getAdminSession } from '@/api/admin'
+import { adminResourceRouteTarget } from '@/admin/admin-resource-route'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,11 +31,16 @@ const router = createRouter({
       name: 'exercise',
       component: ExerciseView,
     },
+    { path: '/map', name: 'gym-map', component: GymMapView },
     ...adminRoutes,
   ],
 })
 
 router.beforeEach(async (to) => {
+  if (to.name === 'admin-resource') {
+    const resourceTarget = adminResourceRouteTarget(to.params.resource)
+    if (resourceTarget !== true) return resourceTarget
+  }
   if (!to.meta.requiresAdmin && !to.meta.adminGuest) return true
   try {
     await getAdminSession()

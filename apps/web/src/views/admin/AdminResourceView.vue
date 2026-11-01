@@ -1,70 +1,17 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { createAdminRecord, getAdmin, setAdminRecordArchived, updateAdminRecord } from '@/api/admin'
-
-const definitions = {
-  'muscle-groups': {
-    title: 'Muscle groups',
-    fields: [
-      ['name', 'Name'],
-      ['description', 'Description', 'textarea'],
-      ['sortOrder', 'Sort order', 'number'],
-    ],
-  },
-  'equipment-types': {
-    title: 'Equipment types',
-    fields: [
-      ['name', 'Name'],
-      ['description', 'Description', 'textarea'],
-      ['sortOrder', 'Sort order', 'number'],
-    ],
-  },
-  'gym-equipment': {
-    title: 'Gym equipment',
-    fields: [
-      ['equipmentTypeId', 'Equipment type', 'select', 'equipment-types'],
-      ['displayName', 'Display name'],
-      ['details', 'Details', 'textarea'],
-      ['isAvailable', 'Available', 'checkbox'],
-    ],
-  },
-  exercises: {
-    title: 'Exercises',
-    fields: [
-      ['name', 'Name'],
-      ['summary', 'Summary', 'textarea'],
-      ['instructions', 'Instructions (one per line)', 'list'],
-      ['benefits', 'Benefits (one per line)', 'list'],
-      ['tips', 'Tips (one per line)', 'list'],
-      ['commonMistakes', 'Common mistakes (one per line)', 'list'],
-      ['sortOrder', 'Sort order', 'number'],
-    ],
-  },
-  variations: {
-    title: 'Exercise variations',
-    fields: [
-      ['exerciseId', 'Parent exercise', 'select', 'exercises'],
-      ['name', 'Name'],
-      ['description', 'Description', 'textarea'],
-      ['instructions', 'Instructions (one per line)', 'list'],
-      ['sortOrder', 'Sort order', 'number'],
-    ],
-  },
-  'floor-plans': {
-    title: 'Floor plans',
-    fields: [
-      ['name', 'Name'],
-      ['floorLabel', 'Floor label'],
-      ['imageMediaId', 'Floor plan image', 'select', 'images'],
-      ['sortOrder', 'Sort order', 'number'],
-    ],
-  },
-}
+import { adminResourceDefinitions } from '@/admin/admin-resource-definitions'
+import { useLocale } from '@/localization/locale'
+import { apiErrorMessageKey } from '@/localization/api-error'
+import { localizeRecord } from '@/localization/demo-content'
+import { createLatestRequest } from '@/composables/latest-request'
 
 const route = useRoute()
+const { t, locale } = useLocale()
 const resource = computed(() => route.params.resource)
-const definition = computed(() => definitions[resource.value])
+const definition = computed(() => adminResourceDefinitions[resource.value])
 const records = ref([])
 const options = reactive({
   'equipment-types': [],
@@ -81,6 +28,8 @@ const editingId = ref(null)
 const submitting = ref(false)
 const selectedExercise = ref('')
 const form = reactive({})
+const formPanel = ref(null)
+const latestRequest = createLatestRequest()
 const isExercise = computed(() => resource.value === 'exercises')
 const shownRecords = computed(() =>
   resource.value === 'variations' && selectedExercise.value
@@ -88,14 +37,51 @@ const shownRecords = computed(() =>
     : records.value,
 )
 
+function isLocalizedField(type) {
+  return type?.startsWith('localized-')
+}
+
+function inputValue(value, type) {
+  if (type === 'localized-list') return Array.isArray(value) ? value.join('\n') : ''
+  return typeof value === 'string' ? value : ''
+}
+
+function localizationKind(resourceName = resource.value) {
+  if (resourceName === 'muscle-groups') return 'muscle'
+  if (resourceName === 'equipment-types') return 'equipment'
+  if (resourceName === 'variations') return 'variation'
+  if (resourceName === 'exercises') return 'exercise'
+  return 'catalog'
+}
+
+function localizedRecord(record, resourceName = resource.value) {
+  return localizeRecord(record, locale.value, localizationKind(resourceName))
+}
+
+function recordLanguageValue(record, language, field) {
+  const otherLanguage = language === 'mk-MK' ? 'en' : 'mk-MK'
+  if (Object.hasOwn(record.translations?.[language] || {}, field))
+    return record.translations[language][field]
+  const demoAwareRecord = localizeRecord(record, language, localizationKind())
+  const candidates = [
+    record.translations?.[otherLanguage]?.[field],
+    demoAwareRecord[field],
+    record[field],
+  ]
+  return candidates.find((value) =>
+    Array.isArray(value) ? value.length > 0 : typeof value === 'string' && value.trim(),
+  )
+}
+
 function blankForm() {
   Object.keys(form).forEach((key) => delete form[key])
-  for (const [name, , type] of definition.value?.fields || [])
-    form[name] = type === 'checkbox' ? true : type === 'number' ? 0 : ''
-  form.instructions ??= ''
-  form.benefits ??= ''
-  form.tips ??= ''
-  form.commonMistakes ??= ''
+  form.translations = { 'mk-MK': {}, en: {} }
+  for (const [name, , type] of definition.value?.fields || []) {
+    if (isLocalizedField(type)) {
+      form.translations['mk-MK'][name] = ''
+      form.translations.en[name] = ''
+    } else form[name] = type === 'checkbox' ? true : type === 'number' ? 0 : ''
+  }
   form.primaryMuscleGroupIds = []
   form.secondaryMuscleGroupIds = []
   form.equipmentTypeIds = []
@@ -106,6 +92,15 @@ function blankForm() {
 function toForm(record) {
   blankForm()
   for (const [field, , type] of definition.value.fields) {
+    if (isLocalizedField(type)) {
+      for (const language of ['mk-MK', 'en']) {
+        form.translations[language][field] = inputValue(
+          recordLanguageValue(record, language, field),
+          type,
+        )
+      }
+      continue
+    }
     const value = record[field]
     form[field] =
       type === 'list' ? (value || []).join('\n') : (value ?? (type === 'checkbox' ? true : ''))
@@ -119,43 +114,66 @@ function toForm(record) {
   }
 }
 
-async function load() {
+function clearOptions() {
+  options['equipment-types'] = []
+  options.exercises = []
+  options['muscle-groups'] = []
+  options.images = []
+  options.videos = []
+}
+
+async function load(resourceName = resource.value) {
   loading.value = true
   error.value = ''
-  try {
-    records.value = await getAdmin(`${resource.value}?includeArchived=${includeArchived.value}`)
+  const result = await latestRequest.run(async (signal) => {
+    const loadedRecords = await getAdmin(
+      `${resourceName}?includeArchived=${includeArchived.value}`,
+      { signal },
+    )
     const jobs = []
-    if (resource.value === 'gym-equipment' || resource.value === 'exercises')
+    const loadedOptions = {
+      'equipment-types': [],
+      exercises: [],
+      'muscle-groups': [],
+      images: [],
+      videos: [],
+    }
+    if (resourceName === 'gym-equipment' || resourceName === 'exercises')
       jobs.push(
-        getAdmin('equipment-types').then((value) => {
-          options['equipment-types'] = value
+        getAdmin('equipment-types', { signal }).then((value) => {
+          loadedOptions['equipment-types'] = value
         }),
       )
-    if (resource.value === 'exercises')
+    if (resourceName === 'exercises')
       jobs.push(
-        getAdmin('muscle-groups').then((value) => {
-          options['muscle-groups'] = value
+        getAdmin('muscle-groups', { signal }).then((value) => {
+          loadedOptions['muscle-groups'] = value
         }),
       )
-    if (resource.value === 'variations')
+    if (resourceName === 'variations')
       jobs.push(
-        getAdmin('exercises').then((value) => {
-          options.exercises = value
+        getAdmin('exercises', { signal }).then((value) => {
+          loadedOptions.exercises = value
         }),
       )
-    if (resource.value === 'exercises' || resource.value === 'floor-plans')
+    if (resourceName === 'exercises' || resourceName === 'floor-plans')
       jobs.push(
-        getAdmin('media').then((value) => {
-          options.images = value.filter((asset) => asset.mediaType === 'image')
-          options.videos = value.filter((asset) => asset.mediaType === 'video')
+        getAdmin('media', { signal }).then((value) => {
+          loadedOptions.images = value.filter((asset) => asset.mediaType === 'image')
+          loadedOptions.videos = value.filter((asset) => asset.mediaType === 'video')
         }),
       )
     await Promise.all(jobs)
-  } catch (requestError) {
-    error.value = requestError.message
-  } finally {
-    loading.value = false
+    return { records: loadedRecords, options: loadedOptions }
+  })
+  if (!result.current) return
+  if (result.error) {
+    error.value = apiErrorMessageKey(result.error)
+  } else {
+    records.value = result.value.records
+    Object.assign(options, result.value.options)
   }
+  loading.value = false
 }
 
 function startCreate() {
@@ -169,6 +187,12 @@ function startEdit(record) {
   toForm(record)
   notice.value = ''
   error.value = ''
+  nextTick(() => {
+    formPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    formPanel.value?.querySelector('input:not([type="checkbox"]), textarea, select')?.focus({
+      preventScroll: true,
+    })
+  })
 }
 function cancelEdit() {
   editingId.value = null
@@ -180,7 +204,25 @@ function toggle(field, id) {
 }
 function payload() {
   const result = {}
+  result.translations = { 'mk-MK': {}, en: {} }
   for (const [field, , type] of definition.value.fields) {
+    if (isLocalizedField(type)) {
+      for (const language of ['mk-MK', 'en']) {
+        const value = form.translations[language][field]
+        result.translations[language][field] =
+          type === 'localized-list'
+            ? value
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean)
+            : value
+      }
+      const macedonianValue = result.translations['mk-MK'][field]
+      const englishValue = result.translations.en[field]
+      const hasValue = (value) => (Array.isArray(value) ? value.length > 0 : Boolean(value.trim()))
+      result[field] = hasValue(macedonianValue) ? macedonianValue : englishValue
+      continue
+    }
     const value = form[field]
     result[field] =
       type === 'list'
@@ -211,12 +253,12 @@ async function save() {
     const data = payload()
     if (editingId.value) await updateAdminRecord(resource.value, editingId.value, data)
     else await createAdminRecord(resource.value, data)
-    notice.value = editingId.value ? 'Changes saved.' : 'Record added.'
+    notice.value = editingId.value ? 'admin.recordSaved' : 'admin.recordAdded'
     editingId.value = null
     blankForm()
     await load()
   } catch (requestError) {
-    error.value = requestError.message
+    error.value = apiErrorMessageKey(requestError)
   } finally {
     submitting.value = false
   }
@@ -227,228 +269,288 @@ async function toggleArchived(record) {
   notice.value = ''
   try {
     await setAdminRecordArchived(resource.value, record.id, record.isActive !== false)
-    notice.value = record.isActive === false ? 'Record restored.' : 'Record archived.'
+    notice.value = record.isActive === false ? 'admin.recordRestored' : 'admin.recordArchived'
     await load()
   } catch (requestError) {
-    error.value = requestError.message
+    error.value = apiErrorMessageKey(requestError)
   }
 }
 
 function recordName(record) {
-  return record.name || record.displayName
+  return localizedRecord(record).name || record.displayName
+}
+function recordDescription(record) {
+  const localized = localizedRecord(record)
+  return localized.description || localized.summary || record.details
 }
 function optionName(kind, id) {
-  return (options[kind] || []).find((item) => item.id === id)?.name || id
+  const option = (options[kind] || []).find((item) => item.id === id)
+  return (option && localizedRecord(option, localizationKind(kind)))?.name || id
 }
 function selectLabel(kind, option) {
-  return kind === 'images' ? option.originalName : option.name
+  if (kind === 'images') return option.originalName
+  return localizedRecord(option, localizationKind(kind)).name
 }
 function mediaName(id) {
   return [...options.images, ...options.videos].find((asset) => asset.id === id)?.originalName || id
 }
 
-watch(resource, () => {
-  startCreate()
-  selectedExercise.value = ''
-  load()
-})
-watch(includeArchived, load)
-onMounted(() => {
-  blankForm()
-  load()
-})
+watch(
+  [resource, includeArchived],
+  ([resourceName], [previousResource]) => {
+    latestRequest.cancel()
+    if (resourceName !== previousResource) {
+      startCreate()
+      selectedExercise.value = ''
+      records.value = []
+      clearOptions()
+    }
+    load(resourceName)
+  },
+  { immediate: true, flush: 'sync' },
+)
+onBeforeUnmount(() => latestRequest.cancel())
 </script>
 
 <template>
   <section v-if="definition">
     <div class="admin-page-heading">
       <div>
-        <p class="admin-eyebrow">Content</p>
-        <h1>{{ definition.title }}</h1>
-        <p class="admin-muted">Manage reusable catalog content and this demo gym's inventory.</p>
+        <p class="admin-eyebrow">{{ t('admin.content') }}</p>
+        <h1>{{ t(definition.titleKey) }}</h1>
+        <p class="admin-muted">{{ t('admin.manageDescription') }}</p>
       </div>
       <button class="admin-button admin-button-primary" @click="startCreate">
-        + Add {{ definition.title.replace(/s$/, '').toLowerCase() }}
+        + {{ t('admin.addRecord') }}
       </button>
     </div>
-    <p v-if="notice" class="admin-success" role="status">{{ notice }}</p>
-    <p v-if="error" class="admin-alert" role="alert">{{ error }}</p>
-    <div class="admin-panel admin-form-panel">
-      <div class="admin-form-heading">
-        <h2>{{ editingId ? 'Edit record' : 'Add record' }}</h2>
-        <button v-if="editingId" class="admin-button admin-button-quiet" @click="cancelEdit">
-          Cancel edit
-        </button>
-      </div>
-      <form class="admin-form-grid" @submit.prevent="save">
-        <label
-          v-for="[field, label, type, optionKind] in definition.fields"
-          :key="field"
-          :class="type === 'textarea' || type === 'list' ? 'admin-field-wide' : ''"
-        >
-          <template v-if="type === 'checkbox'"
-            ><span>{{ label }}</span
-            ><input v-model="form[field]" type="checkbox"
-          /></template>
-          <template v-else-if="type === 'select'"
-            ><span>{{ label }}</span
-            ><select v-model="form[field]" required>
-              <option disabled value="">Choose…</option>
-              <option v-for="option in options[optionKind]" :key="option.id" :value="option.id">
-                {{ selectLabel(optionKind, option) }}
-              </option>
-            </select></template
-          >
-          <template v-else
-            ><span>{{ label }}</span
-            ><textarea
-              v-if="type === 'textarea' || type === 'list'"
-              v-model="form[field]"
-              :required="type === 'list' || ['description', 'summary'].includes(field)"
-              :rows="type === 'list' ? 4 : 3" /><input
-              v-else
-              v-model="form[field]"
-              :type="type === 'number' ? 'number' : 'text'"
-              :required="['name', 'summary'].includes(field)"
-              :min="type === 'number' ? 0 : undefined"
-          /></template>
-        </label>
-        <template v-if="isExercise">
-          <label class="admin-field-wide"
-            ><span>Instructional video</span
-            ><select v-model="form.videoMediaId">
-              <option value="">No video</option>
-              <option v-for="asset in options.videos" :key="asset.id" :value="asset.id">
-                {{ asset.originalName }}
-              </option>
-            </select></label
-          >
-          <fieldset class="admin-field-wide">
-            <legend>Exercise images</legend>
-            <label v-for="asset in options.images" :key="asset.id" class="admin-check-option"
-              ><input v-model="form.imageMediaIds" type="checkbox" :value="asset.id" />{{
-                asset.originalName
-              }}</label
-            >
-            <p v-if="!options.images.length" class="admin-muted">
-              Upload images in Media library first.
+    <p v-if="notice" class="admin-success" role="status">{{ t(notice) }}</p>
+    <p v-if="error" class="admin-alert" role="alert">{{ t(error) }}</p>
+    <div class="admin-resource-workspace">
+      <div
+        ref="formPanel"
+        class="admin-panel admin-form-panel"
+        :class="{ 'admin-form-editing': editingId }"
+      >
+        <div class="admin-form-heading">
+          <div>
+            <h2>{{ editingId ? t('admin.editRecord') : t('admin.addRecord') }}</h2>
+            <p v-if="editingId" class="admin-editing-record">
+              {{ recordName(records.find((record) => record.id === editingId) || {}) }}
             </p>
-          </fieldset>
-          <label
-            ><span>Primary muscle group</span
-            ><select v-model="form.primaryMuscleGroupIds[0]" required>
-              <option disabled value="">Choose one…</option>
-              <option
+          </div>
+          <button v-if="editingId" class="admin-button admin-button-quiet" @click="cancelEdit">
+            {{ t('admin.cancel') }}
+          </button>
+        </div>
+        <form class="admin-form-grid" @submit.prevent="save">
+          <template v-for="[field, labelKey, type, optionKind] in definition.fields" :key="field">
+            <fieldset
+              v-if="isLocalizedField(type)"
+              class="admin-field-wide localized-content-field"
+            >
+              <legend>{{ t(labelKey) }}</legend>
+              <label>
+                {{ t('admin.macedonianVersion') }}
+                <textarea
+                  v-if="type === 'localized-textarea' || type === 'localized-list'"
+                  v-model="form.translations['mk-MK'][field]"
+                  :rows="type === 'localized-list' ? 4 : 3"
+                /><input v-else v-model="form.translations['mk-MK'][field]" type="text" />
+              </label>
+              <label>
+                {{ t('admin.englishVersion') }}
+                <textarea
+                  v-if="type === 'localized-textarea' || type === 'localized-list'"
+                  v-model="form.translations.en[field]"
+                  :rows="type === 'localized-list' ? 4 : 3"
+                /><input v-else v-model="form.translations.en[field]" type="text" />
+              </label>
+            </fieldset>
+            <label v-else :class="type === 'textarea' || type === 'list' ? 'admin-field-wide' : ''">
+              <template v-if="type === 'checkbox'"
+                ><span>{{ t(labelKey) }}</span
+                ><input v-model="form[field]" type="checkbox"
+              /></template>
+              <template v-else-if="type === 'select'"
+                ><span>{{ t(labelKey) }}</span
+                ><select v-model="form[field]" required>
+                  <option disabled value="">{{ t('admin.choose') }}</option>
+                  <option v-for="option in options[optionKind]" :key="option.id" :value="option.id">
+                    {{ selectLabel(optionKind, option) }}
+                  </option>
+                </select></template
+              >
+              <template v-else
+                ><span>{{ t(labelKey) }}</span
+                ><textarea
+                  v-if="type === 'textarea' || type === 'list'"
+                  v-model="form[field]"
+                  :required="type === 'list' || ['description', 'summary'].includes(field)"
+                  :rows="type === 'list' ? 4 : 3" /><input
+                  v-else
+                  v-model="form[field]"
+                  :type="type === 'number' ? 'number' : 'text'"
+                  :required="['name', 'summary'].includes(field)"
+                  :min="type === 'number' ? 0 : undefined"
+              /></template>
+            </label>
+          </template>
+          <template v-if="isExercise">
+            <label class="admin-field-wide"
+              ><span>{{ t('admin.instructionalVideo') }}</span
+              ><select v-model="form.videoMediaId">
+                <option value="">{{ t('admin.noVideo') }}</option>
+                <option v-for="asset in options.videos" :key="asset.id" :value="asset.id">
+                  {{ asset.originalName }}
+                </option>
+              </select></label
+            >
+            <fieldset class="admin-field-wide">
+              <legend>{{ t('admin.exerciseImages') }}</legend>
+              <label v-for="asset in options.images" :key="asset.id" class="admin-check-option"
+                ><input v-model="form.imageMediaIds" type="checkbox" :value="asset.id" />{{
+                  asset.originalName
+                }}</label
+              >
+              <p v-if="!options.images.length" class="admin-muted">
+                {{ t('admin.uploadImagesFirst') }}
+              </p>
+            </fieldset>
+            <label
+              ><span>{{ t('admin.primaryMuscle') }}</span
+              ><select v-model="form.primaryMuscleGroupIds[0]" required>
+                <option disabled value="">{{ t('admin.chooseOne') }}</option>
+                <option
+                  v-for="option in options['muscle-groups']"
+                  :key="option.id"
+                  :value="option.id"
+                >
+                  {{ optionName('muscle-groups', option.id) }}
+                </option>
+              </select></label
+            >
+            <fieldset>
+              <legend>{{ t('admin.secondaryMuscles') }}</legend>
+              <label
                 v-for="option in options['muscle-groups']"
                 :key="option.id"
-                :value="option.id"
+                class="admin-check-option"
+                ><input
+                  type="checkbox"
+                  :checked="form.secondaryMuscleGroupIds.includes(option.id)"
+                  @change="toggle('secondaryMuscleGroupIds', option.id)"
+                />{{ optionName('muscle-groups', option.id) }}</label
               >
-                {{ option.name }}
+            </fieldset>
+            <fieldset class="admin-field-wide">
+              <legend>{{ t('admin.supportedEquipment') }}</legend>
+              <label
+                v-for="option in options['equipment-types']"
+                :key="option.id"
+                class="admin-check-option"
+                ><input
+                  type="checkbox"
+                  :checked="form.equipmentTypeIds.includes(option.id)"
+                  @change="toggle('equipmentTypeIds', option.id)"
+                />{{ optionName('equipment-types', option.id) }}</label
+              >
+            </fieldset>
+          </template>
+          <div class="admin-form-actions admin-field-wide">
+            <button class="admin-button admin-button-primary" type="submit" :disabled="submitting">
+              {{
+                submitting
+                  ? t('admin.saving')
+                  : editingId
+                    ? t('admin.saveChanges')
+                    : t('admin.addRecord')
+              }}
+            </button>
+          </div>
+        </form>
+      </div>
+      <div class="admin-resource-list-area">
+        <div class="admin-list-toolbar">
+          <label class="admin-check-option"
+            ><input v-model="includeArchived" type="checkbox" />{{
+              t('admin.includeArchived')
+            }}</label
+          ><label v-if="resource === 'variations'"
+            >{{ t('admin.filterExercise')
+            }}<select v-model="selectedExercise">
+              <option value="">{{ t('admin.allExercises') }}</option>
+              <option v-for="exercise in options.exercises" :key="exercise.id" :value="exercise.id">
+                {{ exercise.name }}
               </option>
             </select></label
           >
-          <fieldset>
-            <legend>Secondary muscle groups</legend>
-            <label
-              v-for="option in options['muscle-groups']"
-              :key="option.id"
-              class="admin-check-option"
-              ><input
-                type="checkbox"
-                :checked="form.secondaryMuscleGroupIds.includes(option.id)"
-                @change="toggle('secondaryMuscleGroupIds', option.id)"
-              />{{ option.name }}</label
-            >
-          </fieldset>
-          <fieldset class="admin-field-wide">
-            <legend>Supported equipment types</legend>
-            <label
-              v-for="option in options['equipment-types']"
-              :key="option.id"
-              class="admin-check-option"
-              ><input
-                type="checkbox"
-                :checked="form.equipmentTypeIds.includes(option.id)"
-                @change="toggle('equipmentTypeIds', option.id)"
-              />{{ option.name }}</label
-            >
-          </fieldset>
-        </template>
-        <div class="admin-form-actions admin-field-wide">
-          <button class="admin-button admin-button-primary" type="submit" :disabled="submitting">
-            {{ submitting ? 'Saving…' : editingId ? 'Save changes' : 'Add record' }}
-          </button>
         </div>
-      </form>
-    </div>
-    <div class="admin-list-toolbar">
-      <label class="admin-check-option"
-        ><input v-model="includeArchived" type="checkbox" />Include archived</label
-      ><label v-if="resource === 'variations'"
-        >Filter by exercise<select v-model="selectedExercise">
-          <option value="">All exercises</option>
-          <option v-for="exercise in options.exercises" :key="exercise.id" :value="exercise.id">
-            {{ exercise.name }}
-          </option>
-        </select></label
-      >
-    </div>
-    <p v-if="loading" class="admin-message">Loading records…</p>
-    <div v-else-if="!shownRecords.length" class="admin-panel admin-message">
-      No records found. Add the first one above.
-    </div>
-    <div v-else class="admin-record-list">
-      <article v-for="record in shownRecords" :key="record.id" class="admin-record-card">
-        <div class="admin-record-copy">
-          <div class="admin-record-title">
-            <h3>{{ recordName(record) }}</h3>
-            <span
-              class="admin-status"
-              :class="record.isActive === false ? 'admin-status-archived' : ''"
-              >{{ record.isActive === false ? 'Archived' : 'Active' }}</span
-            >
-          </div>
-          <p v-if="record.description || record.summary || record.details" class="admin-muted">
-            {{ record.description || record.summary || record.details }}
-          </p>
-          <p v-if="resource === 'gym-equipment'" class="admin-meta">
-            {{ optionName('equipment-types', record.equipmentTypeId) }} ·
-            {{ record.isAvailable ? 'Available' : 'Unavailable' }}
-          </p>
-          <p v-if="resource === 'variations'" class="admin-meta">
-            For {{ optionName('exercises', record.exerciseId) }}
-          </p>
-          <p v-if="resource === 'floor-plans'" class="admin-meta">
-            {{ record.floorLabel }} · Image: {{ mediaName(record.imageMediaId) }}
-          </p>
-          <p v-if="isExercise" class="admin-meta">
-            {{
-              record.primaryMuscleGroupIds.map((id) => optionName('muscle-groups', id)).join(', ')
-            }}
-            ·
-            {{ record.equipmentTypeIds.map((id) => optionName('equipment-types', id)).join(', ') }}
-          </p>
+        <p v-if="loading" class="admin-message" role="status">{{ t('admin.loadingRecords') }}</p>
+        <div v-else-if="!shownRecords.length" class="admin-panel admin-message">
+          {{ t('admin.emptyRecords') }}
         </div>
-        <div class="admin-record-actions">
-          <button class="admin-button" @click="startEdit(record)">Edit</button
-          ><RouterLink
-            v-if="resource === 'floor-plans'"
-            class="admin-button"
-            :to="`/admin/floor-plans/${encodeURIComponent(record.id)}/edit`"
-            >Positions</RouterLink
-          ><button
-            class="admin-button"
-            :class="record.isActive === false ? 'admin-button-primary' : 'admin-button-danger'"
-            @click="toggleArchived(record)"
-          >
-            {{ record.isActive === false ? 'Restore' : 'Archive' }}
-          </button>
+        <div v-else class="admin-record-list">
+          <article v-for="record in shownRecords" :key="record.id" class="admin-record-card">
+            <div class="admin-record-copy">
+              <div class="admin-record-title">
+                <h3>{{ recordName(record) }}</h3>
+                <span
+                  class="admin-status"
+                  :class="record.isActive === false ? 'admin-status-archived' : ''"
+                  >{{ record.isActive === false ? t('admin.archived') : t('admin.active') }}</span
+                >
+              </div>
+              <p v-if="recordDescription(record)" class="admin-muted">
+                {{ recordDescription(record) }}
+              </p>
+              <p v-if="resource === 'gym-equipment'" class="admin-meta">
+                {{ optionName('equipment-types', record.equipmentTypeId) }} ·
+                {{ record.isAvailable ? t('admin.availableStatus') : t('admin.unavailableStatus') }}
+              </p>
+              <p v-if="resource === 'variations'" class="admin-meta">
+                {{
+                  t('admin.forExercise', { exercise: optionName('exercises', record.exerciseId) })
+                }}
+              </p>
+              <p v-if="resource === 'floor-plans'" class="admin-meta">
+                {{ record.floorLabel }} · {{ t('admin.image') }}:
+                {{ mediaName(record.imageMediaId) }}
+              </p>
+              <p v-if="isExercise" class="admin-meta">
+                {{
+                  record.primaryMuscleGroupIds
+                    .map((id) => optionName('muscle-groups', id))
+                    .join(', ')
+                }}
+                ·
+                {{
+                  record.equipmentTypeIds.map((id) => optionName('equipment-types', id)).join(', ')
+                }}
+              </p>
+            </div>
+            <div class="admin-record-actions">
+              <button class="admin-button" @click="startEdit(record)">{{ t('admin.edit') }}</button
+              ><RouterLink
+                v-if="resource === 'floor-plans'"
+                class="admin-button"
+                :to="`/admin/floor-plans/${encodeURIComponent(record.id)}/edit`"
+                >{{ t('admin.positionsAction') }}</RouterLink
+              ><button
+                class="admin-button"
+                :class="record.isActive === false ? 'admin-button-primary' : 'admin-button-danger'"
+                @click="toggleArchived(record)"
+              >
+                {{ record.isActive === false ? t('admin.restore') : t('admin.archive') }}
+              </button>
+            </div>
+          </article>
         </div>
-      </article>
+      </div>
     </div>
   </section>
   <section v-else class="admin-panel">
-    <h1>Unknown content section</h1>
-    <RouterLink to="/admin/dashboard">Return to dashboard</RouterLink>
+    <h1>{{ t('admin.unknownSection') }}</h1>
+    <RouterLink to="/admin/dashboard">{{ t('admin.returnDashboard') }}</RouterLink>
   </section>
 </template>

@@ -5,6 +5,7 @@ module.exports = {
     slug: { type: 'string', required: true, unique: true, minLength: 1, maxLength: 80 },
     name: { type: 'string', required: true, minLength: 1, maxLength: 100 },
     description: { type: 'string', required: true, maxLength: 500 },
+    translations: { type: 'json', defaultsTo: {} },
     sortOrder: { type: 'number', required: true, min: 0 },
     isActive: { type: 'boolean', defaultsTo: true },
     isDemo: { type: 'boolean', defaultsTo: false },

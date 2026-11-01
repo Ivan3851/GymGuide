@@ -3,6 +3,14 @@ const MediaService = require('./MediaService')
 
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,139}$/
 
+function memberEquipmentFilter(gymId, includeUnavailable) {
+  return {
+    gymId,
+    isActive: { $ne: false },
+    ...(includeUnavailable ? {} : { isAvailable: true }),
+  }
+}
+
 function database(sailsInstance) {
   const datastore = sailsInstance.hooks.orm.datastores.default
   if (!datastore || !datastore.manager || !datastore.manager.client) {
@@ -18,7 +26,7 @@ function toPublic(document) {
   return { ...rest, id: String(_id) }
 }
 
-async function markersForPlan(db, floorPlan, includeArchived = false) {
+async function markersForPlan(db, floorPlan, includeArchived = false, includeUnavailable = false) {
   const markerRecords = await db
     .collection('floorPlanMarkers')
     .find({ floorPlanId: String(floorPlan._id), gymId: floorPlan.gymId })
@@ -30,7 +38,7 @@ async function markersForPlan(db, floorPlan, includeArchived = false) {
     .find({
       _id: { $in: equipmentIds },
       gymId: floorPlan.gymId,
-      ...(includeArchived ? {} : { isActive: { $ne: false }, isAvailable: true }),
+      ...(includeArchived ? {} : memberEquipmentFilter(floorPlan.gymId, includeUnavailable)),
     })
     .toArray()
   const typesById = new Map()
@@ -56,15 +64,17 @@ async function markersForPlan(db, floorPlan, includeArchived = false) {
           id: String(unit._id),
           displayName: unit.displayName,
           details: unit.details || '',
+          isDemo: unit.isDemo === true,
           equipmentTypeId: unit.equipmentTypeId,
           equipmentTypeName: equipmentType.name,
+          equipmentType: toPublic(equipmentType),
         },
       },
     ]
   })
 }
 
-async function floorPlanDetails(db, plan) {
+async function floorPlanDetails(db, plan, includeUnavailable = false) {
   const imageRecord = await db.collection('mediaAssets').findOne({
     _id: plan.imageMediaId,
     status: 'ready',
@@ -74,7 +84,7 @@ async function floorPlanDetails(db, plan) {
   return {
     ...toPublic(plan),
     image: MediaService.publicAsset(imageRecord),
-    markers: await markersForPlan(db, plan),
+    markers: await markersForPlan(db, plan, false, includeUnavailable),
   }
 }
 
@@ -98,9 +108,11 @@ function exerciseLocationPlanData(equipmentUnits, plans) {
 
 module.exports = {
   exerciseLocationPlanData,
+  memberEquipmentFilter,
   listMemberFloorPlans: async function listMemberFloorPlans(
     sailsInstance,
     gymId = process.env.GYMGUIDE_GYM_ID || 'demo-gym',
+    { includeUnavailable = false } = {},
   ) {
     const db = database(sailsInstance)
     const plans = await db
@@ -108,7 +120,9 @@ module.exports = {
       .find({ gymId, isActive: true })
       .sort({ sortOrder: 1, floorLabel: 1, name: 1 })
       .toArray()
-    const results = await Promise.all(plans.map((plan) => floorPlanDetails(db, plan)))
+    const results = await Promise.all(
+      plans.map((plan) => floorPlanDetails(db, plan, includeUnavailable)),
+    )
     return results.filter(Boolean)
   },
 
@@ -154,15 +168,17 @@ module.exports = {
           .find({ _id: { $in: typeIds }, isActive: true })
           .toArray()
       : []
-    const typeNames = new Map(activeTypes.map((type) => [String(type._id), type.name]))
+    const typesById = new Map(activeTypes.map((type) => [String(type._id), type]))
     const equipmentUnits = units
-      .filter((unit) => typeNames.has(unit.equipmentTypeId))
+      .filter((unit) => typesById.has(unit.equipmentTypeId))
       .map((unit) => ({
         id: String(unit._id),
         displayName: unit.displayName,
         details: unit.details || '',
+        isDemo: unit.isDemo === true,
         equipmentTypeId: unit.equipmentTypeId,
-        equipmentTypeName: typeNames.get(unit.equipmentTypeId),
+        equipmentTypeName: typesById.get(unit.equipmentTypeId).name,
+        equipmentType: toPublic(typesById.get(unit.equipmentTypeId)),
       }))
     return exerciseLocationPlanData(equipmentUnits, plans)
   },

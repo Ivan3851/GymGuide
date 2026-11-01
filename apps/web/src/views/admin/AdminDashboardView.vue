@@ -1,16 +1,19 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { getAdmin } from '@/api/admin'
+import { useLocale } from '@/localization/locale'
+import { apiErrorMessageKey } from '@/localization/api-error'
 
 const loading = ref(true)
 const error = ref('')
 const stats = ref(null)
+const { t } = useLocale()
 const cards = [
-  ['Muscle groups', 'muscleGroups'],
-  ['Equipment types', 'equipmentTypes'],
-  ['Gym equipment units', 'gymEquipment'],
-  ['Exercises', 'exercises'],
-  ['Exercise variations', 'variations'],
+  ['admin.muscleCount', 'muscleGroups'],
+  ['admin.equipmentTypeCount', 'equipmentTypes'],
+  ['admin.equipmentCount', 'gymEquipment'],
+  ['admin.exerciseCount', 'exercises'],
+  ['admin.variationCount', 'variations'],
 ]
 
 async function load() {
@@ -19,7 +22,7 @@ async function load() {
   try {
     stats.value = await getAdmin('dashboard')
   } catch (requestError) {
-    error.value = requestError.message
+    error.value = apiErrorMessageKey(requestError)
   } finally {
     loading.value = false
   }
@@ -31,25 +34,24 @@ onMounted(load)
   <section>
     <div class="admin-page-heading">
       <div>
-        <p class="admin-eyebrow">GymGuide · Demo Gym</p>
-        <h1>Dashboard</h1>
-        <p class="admin-muted">A quick look at the content in this kiosk.</p>
+        <p class="admin-eyebrow">{{ t('admin.dashboardEyebrow') }} · {{ t('admin.demoGym') }}</p>
+        <h1>{{ t('admin.dashboardTitle') }}</h1>
+        <p class="admin-muted">{{ t('admin.dashboardDescription') }}</p>
       </div>
-      <button class="admin-button" @click="load">Refresh</button>
+      <button class="admin-button" @click="load">{{ t('admin.refresh') }}</button>
     </div>
-    <p v-if="loading" class="admin-message">Loading dashboard…</p>
-    <div v-else-if="error" class="admin-alert" role="alert">{{ error }}</div>
+    <p v-if="loading" class="admin-message">{{ t('admin.loadingDashboard') }}</p>
+    <div v-else-if="error" class="admin-alert" role="alert">{{ t(error) }}</div>
     <div v-else class="admin-stat-grid">
       <article v-for="[label, key] in cards" :key="key" class="admin-stat-card">
-        <span>{{ label }}</span
+        <span>{{ t(label) }}</span
         ><strong>{{ stats[key] }}</strong>
       </article>
     </div>
     <div class="admin-panel admin-dashboard-note">
-      <h2>Content management</h2>
+      <h2>{{ t('admin.contentManagement') }}</h2>
       <p>
-        Choose a section from the sidebar to add, edit, archive or restore catalog content. Changes
-        are served to the member kiosk immediately.
+        {{ t('admin.contentManagementText') }}
       </p>
     </div>
   </section>
