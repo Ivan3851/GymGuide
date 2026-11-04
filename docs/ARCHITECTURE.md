@@ -5,13 +5,14 @@
 ```mermaid
 flowchart LR
   Member[Member or staff browser on kiosk PC] -->|HTTP loopback| Sails[Sails.js API and static frontend]
-  Vite[Vue 3 + Vite development server] -->|/api proxy in development| Sails
+  Tablet[Optional development tablet on LAN] -->|Vite on host LAN interface :5173| Vite[Vue 3 + Vite development server]
+  Vite -->|/api proxy to host loopback :1337| Sails
   Sails -->|Waterline and sails-mongo| Mongo[(Local MongoDB)]
   Sails -->|generated filenames and streamed content| Disk[(Persistent media directory)]
   Edge[Microsoft Edge kiosk session] -->|production local URL| Sails
 ```
 
-All production services are on one Windows computer. Sails is the local HTTP origin for both the built SPA and `/api/v1`. In development, Vite serves the SPA on `127.0.0.1:5173` and proxies `/api` to Sails on `127.0.0.1:1337`. MongoDB is reached only through a local MongoDB URI. The production launcher rejects a non-loopback host and a non-loopback MongoDB URI.
+All production services are on one Windows computer. Sails is the local HTTP origin for both the built SPA and `/api/v1`, bound to loopback for the single-PC kiosk. In development, Vite binds to `0.0.0.0:5173` so a tablet on the same LAN can load the frontend; Vite proxies `/api` requests to the host PC's `127.0.0.1:1337` Sails API. The API itself remains loopback-only. This LAN path is development/testing only. MongoDB is reached only through a local MongoDB URI. The production launcher rejects a non-loopback host and a non-loopback MongoDB URI.
 
 There is no internet requirement, cloud service, remote media host or second computer in the runtime path. Update/build inputs may be transferred offline by an operator.
 

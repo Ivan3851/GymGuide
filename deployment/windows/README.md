@@ -65,7 +65,7 @@ MongoDB keeps its database files in its own configured `dbPath`, outside the Gym
 1. Install MongoDB Community Server from the approved offline installer and configure its Windows service for automatic startup using the reviewed `mongod.cfg.example` as a starting point. This must be done by the kiosk installer/operator; GymGuide does not install or edit the MongoDB service. Verify the Mongo service name, local bind address, persistent database path, service account ACL, restart behavior and a successful local connection. Install MongoDB Database Tools separately for operator-initiated backup and restore.
 2. Prefer MongoDB authorization with a dedicated GymGuide database account limited to the GymGuide database. Keep the connection URI in the protected ProgramData config, not in source, command transcripts or installer files. If MongoDB is run without authorization, Windows-local processes can access it; loopback binding limits network exposure but does not provide per-user database isolation.
 3. Run the GymGuide Inno Setup installer. It writes the versioned app, Node runtime and service templates under Program Files and creates the ProgramData directories. It creates `gymguide.env` only if one is absent, and generates a unique secret on first creation. Review `MONGODB_URI`, `GYMGUIDE_GYM_ID`, `HOST`, `PORT` and `GYMGUIDE_MEDIA_DIR`. Leave the optional service-registration task unchecked until the database and first staff account are ready.
-4. From an elevated maintenance console, explicitly seed the intended, empty GymGuide database and create the first staff account. Seed writes are insert-only and abort if non-demo data is present. Admin setup refuses to replace an existing username. Substitute the exact installed version:
+4. **Do not run demo seeding on a customer/production database.** The repository does not currently provide a production-safe real-gym initialization/import command. `setup-admin.js` requires an already active gym, and the demo seed creates demo-marked data. Define an approved real-gym catalog/gym bootstrap process before production service startup; do not substitute demo content. For a disposable demo installation only, after verifying the configured URI points to a newly named demo database, the following commands explicitly seed demo data and then create a demo admin. Admin setup refuses to replace an existing username. Substitute the exact installed version:
 
    ```powershell
    $release = "$env:ProgramFiles\GymGuide\releases\0.1.0"
@@ -74,7 +74,7 @@ MongoDB keeps its database files in its own configured `dbPath`, outside the Gym
    & "$release\runtime\node.exe" -r dotenv/config "$release\app\scripts\setup-admin.js"
    ```
 
-   Startup never seeds or resets data. Neither command runs automatically from the Windows service.
+   Startup never seeds or resets data. Neither command runs automatically from the Windows service. Never run the seed commands on production/customer data.
 
 5. Register the service by selecting the explicit installer task or running the elevated script with the release version:
 

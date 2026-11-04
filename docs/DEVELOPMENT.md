@@ -6,7 +6,7 @@
 - Local MongoDB reachable at `127.0.0.1:27017`.
 - A Node version validated with the exact project lockfiles and MongoDB adapter. At this documentation review, `node -v` returned `v26.13.0` and `npm -v` returned `11.20.0`. The repository does not pin a Node runtime with a version manager file.
 
-The compatibility note in the root README reflects a successful local connection smoke test, not a complete vendor support guarantee. For production, pin the tested runtime in the release record.
+Previously recorded local connection smoke tests are not a complete vendor support guarantee. For production, pin and acceptance-test the runtime in the release record.
 
 Lockfile versions observed during this documentation review:
 
@@ -43,7 +43,7 @@ Edit `apps/api/.env` as needed. Defaults target `mongodb://127.0.0.1:27017/gymgu
 
 ## Seed and account setup
 
-Only run demo seeding against a database you intend to populate. It is explicit, insert-only and refuses when non-demo catalog/inventory records are detected; it is not part of startup.
+Only run demo seeding against a new, disposable development/demo database you intend to populate. It creates fictional demo-marked records, is explicit and insert-only, refuses when protected non-demo catalog/inventory records are detected, and is not part of startup. Never run it against production/customer content. There is currently no production-safe real-gym initialization/import command; admin provisioning requires an active gym record. See [Installation](INSTALLATION.md) for this deployment limitation.
 
 ```powershell
 npm run seed:demo
@@ -66,7 +66,9 @@ Terminal 2:
 npm run dev:web
 ```
 
-Open `http://127.0.0.1:5173`. The Vite config binds to loopback, uses a strict port, and proxies `/api` to `http://127.0.0.1:1337`. The backend serves health at `/api/v1/health`.
+Open `http://127.0.0.1:5173`. Vite binds to `0.0.0.0:5173` (all host network interfaces) with a strict port, while its `/api` proxy targets `http://127.0.0.1:1337`. The Sails API remains bound to loopback by default; do not expose port 1337 or MongoDB to the LAN for tablet development access.
+
+To open the development frontend from a tablet on the same trusted LAN, run `ipconfig` on the PC, find its active adapter's IPv4 address, then navigate to `http://<PC-IP>:5173` on the tablet. Replace `<PC-IP>` with the address shown by `ipconfig`. If Windows Firewall prompts, allow the development server only on the trusted Private network. A Wi-Fi router's client/AP isolation can block device-to-device access. Do not disable isolation or change firewall rules without authorization. This is only a development/testing feature; production uses the loopback Sails origin and does not need a LAN listener or firewall exception.
 
 ## Tests, lint, format and build
 
