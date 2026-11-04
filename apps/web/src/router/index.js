@@ -4,6 +4,7 @@ import ExerciseView from '@/views/ExerciseView.vue'
 import HomeView from '@/views/HomeView.vue'
 import MuscleGroupView from '@/views/MuscleGroupView.vue'
 import GymMapView from '@/views/GymMapView.vue'
+import ExerciseDirectoryView from '@/views/ExerciseDirectoryView.vue'
 import { adminRoutes } from './admin-views'
 import { getAdminSession } from '@/api/admin'
 import { adminResourceRouteTarget } from '@/admin/admin-resource-route'
@@ -32,6 +33,7 @@ const router = createRouter({
       component: ExerciseView,
     },
     { path: '/map', name: 'gym-map', component: GymMapView },
+    { path: '/exercises', name: 'exercise-directory', component: ExerciseDirectoryView },
     ...adminRoutes,
   ],
 })

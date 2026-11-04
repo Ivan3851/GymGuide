@@ -12,13 +12,19 @@ const route = useRoute()
     <RouterLink class="brand" to="/" :aria-label="t('app.home')">
       <img class="brand-logo" :src="paljoLogo" alt="Paljo Fitness" />
       <span class="brand-copy">
-        <span class="brand-name">GymGuide</span>
+        <span class="brand-name">Powered by Ascendra.mk</span>
         <span class="header-note">{{ t('app.tagline') }}</span>
       </span>
     </RouterLink>
     <nav class="member-horizontal-nav" :aria-label="t('menu.navigation')">
       <RouterLink to="/" :aria-current="route.name === 'home' ? 'page' : undefined">
         {{ t('menu.home') }}
+      </RouterLink>
+      <RouterLink
+        to="/exercises"
+        :aria-current="route.name === 'exercise-directory' ? 'page' : undefined"
+      >
+        {{ t('menu.exercises') }}
       </RouterLink>
       <RouterLink to="/map" :aria-current="route.name === 'gym-map' ? 'page' : undefined">
         {{ t('menu.map') }}

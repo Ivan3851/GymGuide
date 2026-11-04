@@ -155,17 +155,24 @@ async function isPublishedReference(db, asset) {
     return Boolean(
       await db
         .collection('exercises')
-        .findOne({ videoMediaId: String(asset._id), isActive: true }, { projection: { _id: 1 } }),
+        .findOne(
+          { videoMediaId: String(asset._id), isActive: true, isDemo: { $ne: true } },
+          { projection: { _id: 1 } },
+        ),
     )
   }
   const [exercise, floorPlan] = await Promise.all([
     db
       .collection('exercises')
-      .findOne({ imageMediaIds: String(asset._id), isActive: true }, { projection: { _id: 1 } }),
+      .findOne(
+        { imageMediaIds: String(asset._id), isActive: true, isDemo: { $ne: true } },
+        { projection: { _id: 1 } },
+      ),
     db.collection('gymFloorPlans').findOne(
       {
         imageMediaId: String(asset._id),
         isActive: true,
+        isDemo: { $ne: true },
         gymId: process.env.GYMGUIDE_GYM_ID || 'demo-gym',
       },
       { projection: { _id: 1 } },
@@ -216,7 +223,7 @@ module.exports = {
     const db = database(sailsInstance)
     const records = await db
       .collection('mediaAssets')
-      .find({ status: 'ready' })
+      .find({ status: 'ready', isDemo: { $ne: true } })
       .sort({ createdAt: -1 })
       .toArray()
     return records.map(publicAsset)
@@ -382,7 +389,9 @@ module.exports = {
   stream: async function stream(sailsInstance, req, res, id) {
     if (!UUID_PATTERN.test(id || '')) throw ApiError.badRequest('The media ID is invalid.')
     const db = database(sailsInstance)
-    const asset = await db.collection('mediaAssets').findOne({ _id: id, status: 'ready' })
+    const asset = await db
+      .collection('mediaAssets')
+      .findOne({ _id: id, status: 'ready', isDemo: { $ne: true } })
     if (!asset || !validStorageName(asset.storageName)) throw ApiError.notFound('Media not found.')
     const admin = await isAdmin(req, db)
     if (!admin && !(await isPublishedReference(db, asset)))

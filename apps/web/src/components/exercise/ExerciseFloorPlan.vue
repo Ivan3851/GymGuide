@@ -1,18 +1,21 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import FloorPlanCanvas from '@/components/floor-plan/FloorPlanCanvas.vue'
-import { localizeEquipmentUnit } from '@/localization/demo-content'
+import { localizeEquipmentUnit, localizeRecord } from '@/localization/content'
 import { useLocale } from '@/localization/locale'
 
 const props = defineProps({ locations: { type: Object, required: true } })
 const { locale, t } = useLocale()
 const selectedFloorId = ref('')
 const selectedEquipmentId = ref('')
-const currentFloor = computed(
-  () =>
+const currentFloor = computed(() =>
+  localizeRecord(
     props.locations.floorPlans.find((floor) => floor.id === selectedFloorId.value) ||
-    props.locations.floorPlans[0] ||
-    null,
+      props.locations.floorPlans[0] ||
+      null,
+    locale.value,
+    'floorPlan',
+  ),
 )
 const currentMarkers = computed(
   () =>
@@ -71,7 +74,7 @@ watch(selectedFloorId, (floorId) => {
         {{ t('floor.floor') }}
         <select v-model="selectedFloorId">
           <option v-for="floor in locations.floorPlans" :key="floor.id" :value="floor.id">
-            {{ floor.floorLabel }} · {{ floor.name }}
+            {{ localizeRecord(floor, locale, 'floorPlan').name }}
           </option>
         </select>
       </label>
@@ -103,10 +106,7 @@ watch(selectedFloorId, (floorId) => {
         <aside class="exercise-equipment-panel" :aria-label="t('floor.equipmentLocations')">
           <h3>{{ currentMarker?.gymEquipment.displayName || t('floor.equipmentLocations') }}</h3>
           <p v-if="currentMarker">
-            {{ currentMarker.gymEquipment.equipmentTypeName
-            }}<span v-if="currentMarker.gymEquipment.details">
-              · {{ currentMarker.gymEquipment.details }}</span
-            >
+            {{ currentMarker.gymEquipment.equipmentTypeName }}
           </p>
           <p v-else-if="selectedEquipmentId">{{ t('floor.noMarker') }}</p>
           <p v-else>{{ t('floor.selectMarker') }}</p>

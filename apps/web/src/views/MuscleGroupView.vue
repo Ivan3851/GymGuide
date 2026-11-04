@@ -7,7 +7,7 @@ import SelectionCard from '@/components/shared/SelectionCard.vue'
 import StatePanel from '@/components/shared/StatePanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { apiErrorMessageKey } from '@/localization/api-error'
-import { localizeRecord } from '@/localization/demo-content'
+import { localizeRecord } from '@/localization/content'
 import { useLocale } from '@/localization/locale'
 
 const route = useRoute()
@@ -64,6 +64,5 @@ watch(muscleGroupId, (id) => load(id), { immediate: true })
         :detail="t('muscle.unitCount', { count: item.unitCount })"
       />
     </section>
-    <p v-if="muscleGroup?.isDemo" class="demo-note">{{ t('muscle.demoNote') }}</p>
   </div>
 </template>

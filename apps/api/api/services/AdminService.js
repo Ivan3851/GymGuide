@@ -2,11 +2,12 @@ const crypto = require('crypto')
 const ApiError = require('./ApiError')
 const mediaReferenceLock = require('./MediaReferenceLock')
 const BilingualContent = require('./BilingualContent')
+const MuscleGroupHierarchy = require('./MuscleGroupHierarchy')
 
 const resources = {
   'muscle-groups': {
     collection: 'muscleGroups',
-    fields: ['slug', 'name', 'description', 'translations', 'sortOrder'],
+    fields: ['slug', 'name', 'description', 'translations', 'sortOrder', 'parentId'],
     required: ['name', 'description'],
     label: 'muscle group',
   },
@@ -18,7 +19,7 @@ const resources = {
   },
   'gym-equipment': {
     collection: 'gymEquipment',
-    fields: ['equipmentTypeId', 'displayName', 'details', 'isAvailable'],
+    fields: ['equipmentTypeId', 'displayName', 'translations', 'isAvailable'],
     required: ['equipmentTypeId', 'displayName'],
     label: 'gym equipment',
   },
@@ -37,7 +38,7 @@ const resources = {
       'imageMediaIds',
       'sortOrder',
     ],
-    required: ['name', 'summary'],
+    required: ['name'],
     label: 'exercise',
   },
   variations: {
@@ -56,8 +57,8 @@ const resources = {
   },
   'floor-plans': {
     collection: 'gymFloorPlans',
-    fields: ['name', 'floorLabel', 'imageMediaId', 'sortOrder'],
-    required: ['name', 'floorLabel', 'imageMediaId'],
+    fields: ['name', 'translations', 'imageMediaId', 'sortOrder'],
+    required: ['name', 'imageMediaId'],
     label: 'floor plan',
   },
 }
@@ -76,6 +77,22 @@ const publicRecord = (doc) => {
   const { _id, ...rest } = doc
   delete rest.passwordHash
   return { ...rest, id: String(_id) }
+}
+const publicGymEquipment = (doc) => {
+  const result = publicRecord(doc)
+  delete result.details
+  delete result.description
+  if (result.translations) {
+    result.translations = Object.fromEntries(
+      Object.entries(result.translations).map(([language, content]) => {
+        const safeContent = { ...(content || {}) }
+        delete safeContent.details
+        delete safeContent.description
+        return [language, safeContent]
+      }),
+    )
+  }
+  return result
 }
 const slugify = (value) =>
   value
@@ -98,6 +115,56 @@ function definition(resource) {
 function validateId(id, label) {
   if (typeof id !== 'string' || !ID_PATTERN.test(id))
     throw ApiError.badRequest(`The ${label} ID is invalid.`)
+}
+
+async function validateMuscleGroupParent(db, id, data) {
+  if (!Object.hasOwn(data, 'parentId')) return
+  if (data.parentId === '' || data.parentId === null) {
+    data.parentId = null
+    return
+  }
+  const parentId = data.parentId
+  if (typeof parentId !== 'string' || !ID_PATTERN.test(parentId))
+    throw ApiError.badRequest('Select a valid parent muscle group or leave it empty.')
+  if (id && parentId === id) throw ApiError.badRequest('A muscle group cannot be its own parent.')
+
+  const visited = new Set()
+  let cursorId = parentId
+  while (cursorId) {
+    if (id && cursorId === id)
+      throw ApiError.badRequest('This parent assignment would create a circular muscle hierarchy.')
+    if (visited.has(cursorId))
+      throw ApiError.badRequest('The selected parent belongs to a circular muscle hierarchy.')
+    visited.add(cursorId)
+    const parent = await db.collection('muscleGroups').findOne({
+      _id: cursorId,
+      isActive: true,
+      isDemo: { $ne: true },
+    })
+    if (!parent) throw ApiError.badRequest('Select an active parent muscle group.')
+    cursorId = MuscleGroupHierarchy.parentOf(parent)
+  }
+}
+
+function validateExerciseMuscleSelection(primaryIds, secondaryIds) {
+  if (
+    !Array.isArray(primaryIds) ||
+    !Array.isArray(secondaryIds) ||
+    primaryIds.some((value) => typeof value !== 'string') ||
+    secondaryIds.some((value) => typeof value !== 'string') ||
+    primaryIds.length !== 1
+  )
+    throw ApiError.badRequest('Select exactly one primary muscle and unique secondary muscles.')
+  if (new Set(secondaryIds).size !== secondaryIds.length)
+    throw ApiError.badRequest('Secondary muscle groups must not contain duplicates.')
+  if (secondaryIds.includes(primaryIds[0]))
+    throw ApiError.badRequest(
+      'The primary muscle group cannot also be selected as a secondary muscle group.',
+    )
+  return [
+    ...primaryIds.map((muscleGroupId) => ({ muscleGroupId, role: 'primary' })),
+    ...secondaryIds.map((muscleGroupId) => ({ muscleGroupId, role: 'secondary' })),
+  ]
 }
 function validateText(value, label, maximum, required = true) {
   if (
@@ -127,7 +194,7 @@ async function validateReferences(db, resource, data, user) {
   if (resource === 'gym-equipment') {
     const type = await db
       .collection('equipmentTypes')
-      .findOne({ _id: data.equipmentTypeId, isActive: true })
+      .findOne({ _id: data.equipmentTypeId, isActive: true, isDemo: { $ne: true } })
     const gym = await db.collection('gyms').findOne({ _id: user.gymId, status: 'active' })
     if (!type || !gym)
       throw ApiError.badRequest('Select an active equipment type for the active gym.')
@@ -135,7 +202,11 @@ async function validateReferences(db, resource, data, user) {
   }
   if (
     resource === 'variations' &&
-    !(await db.collection('exercises').findOne({ _id: data.exerciseId, isActive: true }))
+    !(await db.collection('exercises').findOne({
+      _id: data.exerciseId,
+      isActive: true,
+      isDemo: { $ne: true },
+    }))
   )
     throw ApiError.badRequest('Select an active parent exercise.')
   if (resource === 'floor-plans') {
@@ -145,6 +216,7 @@ async function validateReferences(db, resource, data, user) {
       _id: data.imageMediaId,
       mediaType: 'image',
       status: 'ready',
+      isDemo: { $ne: true },
     })
     if (!image) throw ApiError.badRequest('Select an uploaded image for this floor plan.')
     data.gymId = user.gymId
@@ -160,6 +232,7 @@ async function validateExerciseMedia(db, data, id) {
       _id: data.videoMediaId,
       mediaType: 'video',
       status: 'ready',
+      isDemo: { $ne: true },
     })
     if (!video) throw ApiError.badRequest('Select an uploaded MP4 video.')
   }
@@ -179,6 +252,7 @@ async function validateExerciseMedia(db, data, id) {
         _id: { $in: ids },
         mediaType: 'image',
         status: 'ready',
+        isDemo: { $ne: true },
       })) !== ids.length
     )
       throw ApiError.badRequest('Every selected exercise image must be available.')
@@ -212,21 +286,28 @@ async function withExerciseRelationships(db, exercise) {
 
 module.exports = {
   resources,
+  validateMuscleGroupParent,
+  validateExerciseMuscleSelection,
   dashboard: async function dashboard(sailsInstance, gymId) {
     const db = dbFor(sailsInstance)
     const [muscleGroups, equipmentTypes, gymEquipment, exercises, variations] = await Promise.all([
-      db.collection('muscleGroups').countDocuments({ isActive: true }),
-      db.collection('equipmentTypes').countDocuments({ isActive: true }),
-      db.collection('gymEquipment').countDocuments({ gymId, isActive: { $ne: false } }),
-      db.collection('exercises').countDocuments({ isActive: true }),
-      db.collection('exerciseVariations').countDocuments({ isActive: true }),
+      db.collection('muscleGroups').countDocuments({ isActive: true, isDemo: { $ne: true } }),
+      db.collection('equipmentTypes').countDocuments({ isActive: true, isDemo: { $ne: true } }),
+      db
+        .collection('gymEquipment')
+        .countDocuments({ gymId, isActive: { $ne: false }, isDemo: { $ne: true } }),
+      db.collection('exercises').countDocuments({ isActive: true, isDemo: { $ne: true } }),
+      db.collection('exerciseVariations').countDocuments({ isActive: true, isDemo: { $ne: true } }),
     ])
     return { muscleGroups, equipmentTypes, gymEquipment, exercises, variations }
   },
   list: async function list(sailsInstance, resource, user, includeArchived) {
     const item = definition(resource)
     const db = dbFor(sailsInstance)
-    const filter = includeArchived ? {} : { isActive: { $ne: false } }
+    const filter = {
+      isDemo: { $ne: true },
+      ...(includeArchived ? {} : { isActive: { $ne: false } }),
+    }
     if (resource === 'gym-equipment' || resource === 'floor-plans') filter.gymId = user.gymId
     const records = await db
       .collection(item.collection)
@@ -235,7 +316,13 @@ module.exports = {
       .toArray()
     if (resource === 'exercises')
       return Promise.all(records.map((record) => withExerciseRelationships(db, record)))
-    return records.map(publicRecord)
+    if (resource === 'floor-plans')
+      return records.map((record) => {
+        const result = publicRecord(record)
+        delete result.floorLabel
+        return result
+      })
+    return records.map(resource === 'gym-equipment' ? publicGymEquipment : publicRecord)
   },
   save: async function save(sailsInstance, resource, id, input, user) {
     const item = definition(resource)
@@ -260,10 +347,14 @@ module.exports = {
     )
     if (!localized && existing?.translations && BilingualContent.schemas[resource]) {
       const legacyTranslations = {
-        'mk-MK': { ...(existing.translations['mk-MK'] || {}) },
-        en: { ...(existing.translations.en || {}) },
+        'mk-MK': {},
+        en: {},
       }
       for (const field of Object.keys(BilingualContent.schemas[resource])) {
+        for (const language of ['mk-MK', 'en']) {
+          if (Object.hasOwn(existing.translations[language] || {}, field))
+            legacyTranslations[language][field] = existing.translations[language][field]
+        }
         if (Object.hasOwn(data, field)) {
           legacyTranslations['mk-MK'][field] = data[field]
           legacyTranslations.en[field] = data[field]
@@ -273,19 +364,21 @@ module.exports = {
     }
     if (localized)
       Object.assign(data, localized.canonical, { translations: localized.translations })
+    if (resource === 'gym-equipment' && existing?.translations && data.translations) {
+      for (const language of ['mk-MK', 'en']) {
+        for (const field of ['details', 'description']) {
+          const legacyValue = existing.translations[language]?.[field]
+          if (legacyValue !== undefined) data.translations[language][field] = legacyValue
+        }
+      }
+    }
     for (const field of item.required)
       if (id && !Object.hasOwn(data, field)) continue
       else
         validateText(
           data[field],
           field,
-          field === 'summary'
-            ? 700
-            : field === 'description'
-              ? 1000
-              : field === 'details'
-                ? 1000
-                : 200,
+          field === 'summary' ? 700 : field === 'description' ? 1000 : 200,
           true,
         )
     if (resource !== 'gym-equipment' && resource !== 'variations') {
@@ -305,27 +398,34 @@ module.exports = {
     if (resource === 'gym-equipment') {
       validateText(data.equipmentTypeId, 'equipmentTypeId', 120)
       validateText(data.displayName, 'displayName', 160)
-      if (data.details !== undefined) validateText(data.details, 'details', 1000, false)
       if (data.isAvailable !== undefined && typeof data.isAvailable !== 'boolean')
         throw ApiError.badRequest('isAvailable must be true or false.')
       if (!id) data.slug = `gym-${user.gymId}-${crypto.randomUUID()}`
     }
     if (resource === 'floor-plans') {
       validateText(data.name, 'name', 120)
-      validateText(data.floorLabel, 'floorLabel', 80)
       if (data.sortOrder === undefined && !id) data.sortOrder = 0
       validateOrder(data.sortOrder)
-      if (!id) data.slug = slugify(`${user.gymId}-${data.floorLabel}-${data.name}`)
+      if (!id) {
+        const base = slugify(`${user.gymId}-${input.translations?.en?.name || data.name}`).slice(
+          0,
+          80,
+        )
+        data.slug = `${base || 'floor-plan'}-${crypto.randomUUID()}`
+      }
     }
     if (resource === 'exercises') {
+      if (data.summary !== undefined) validateText(data.summary, 'summary', 700, false)
       for (const [field, label] of [
         ['instructions', 'Instructions'],
         ['benefits', 'Benefits'],
         ['tips', 'Tips'],
         ['commonMistakes', 'Common mistakes'],
-      ])
-        validateList(data[field], label, !id)
-      if (data.sortOrder === undefined && !id) data.sortOrder = 0
+      ]) {
+        const required = field === 'instructions' && !id
+        if (!id && !required && data[field] === undefined) data[field] = []
+        validateList(data[field], label, required)
+      }
       validateOrder(data.sortOrder)
       if (!id) data.slug = createContentSlug(input, resource, data.name)
       if (data.slug !== undefined && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.slug))
@@ -360,11 +460,13 @@ module.exports = {
       data.isActive = true
       data.createdAt = Date.now()
     }
+    if (resource === 'muscle-groups') await validateMuscleGroupParent(db, id, data)
     await validateReferences(db, resource, data, user)
     let exerciseMuscleIds = null
     let exerciseEquipmentIds = null
+    let existingMuscles = []
     if (resource === 'exercises') {
-      const existingMuscles = id
+      existingMuscles = id
         ? await db.collection('exerciseMuscles').find({ exerciseId: id }).toArray()
         : []
       const existingEquipment = id
@@ -382,23 +484,12 @@ module.exports = {
           .map((entry) => entry.muscleGroupId)
       exerciseEquipmentIds =
         input.equipmentTypeIds ?? existingEquipment.map((entry) => entry.equipmentTypeId)
-      if (
-        !Array.isArray(primaryIds) ||
-        !Array.isArray(secondaryIds) ||
-        [...primaryIds, ...secondaryIds].some((value) => typeof value !== 'string') ||
-        new Set([...primaryIds, ...secondaryIds]).size !==
-          primaryIds.length + secondaryIds.length ||
-        primaryIds.length !== 1
-      )
-        throw ApiError.badRequest('Select exactly one primary muscle and unique secondary muscles.')
-      exerciseMuscleIds = [
-        ...primaryIds.map((muscleGroupId) => ({ muscleGroupId, role: 'primary' })),
-        ...secondaryIds.map((muscleGroupId) => ({ muscleGroupId, role: 'secondary' })),
-      ]
+      exerciseMuscleIds = validateExerciseMuscleSelection(primaryIds, secondaryIds)
       if (
         (await db.collection('muscleGroups').countDocuments({
           _id: { $in: exerciseMuscleIds.map((entry) => entry.muscleGroupId) },
           isActive: true,
+          isDemo: { $ne: true },
         })) !== exerciseMuscleIds.length
       )
         throw ApiError.badRequest('Every selected muscle group must be active.')
@@ -410,10 +501,11 @@ module.exports = {
         throw ApiError.badRequest('Equipment selections must be unique valid IDs.')
       if (
         exerciseEquipmentIds.length &&
-        (await db
-          .collection('equipmentTypes')
-          .countDocuments({ _id: { $in: exerciseEquipmentIds }, isActive: true })) !==
-          exerciseEquipmentIds.length
+        (await db.collection('equipmentTypes').countDocuments({
+          _id: { $in: exerciseEquipmentIds },
+          isActive: true,
+          isDemo: { $ne: true },
+        })) !== exerciseEquipmentIds.length
       )
         throw ApiError.badRequest('Every selected equipment type must be active.')
     }
@@ -453,7 +545,10 @@ module.exports = {
           )
       }
       const saved = await db.collection(item.collection).findOne({ _id: key })
-      return resource === 'exercises' ? withExerciseRelationships(db, saved) : publicRecord(saved)
+      if (resource === 'exercises') return withExerciseRelationships(db, saved)
+      const result = resource === 'gym-equipment' ? publicGymEquipment(saved) : publicRecord(saved)
+      if (resource === 'floor-plans') delete result.floorLabel
+      return result
     }
     return ['exercises', 'floor-plans'].includes(resource)
       ? mediaReferenceLock.run(persist)
@@ -463,6 +558,14 @@ module.exports = {
     const item = definition(resource)
     const db = dbFor(sailsInstance)
     validateId(id, item.label)
+    if (resource === 'muscle-groups' && !active) {
+      const activeChildren = await db.collection('muscleGroups').countDocuments({
+        parentId: id,
+        isActive: { $ne: false },
+      })
+      if (activeChildren)
+        throw ApiError.conflict('Reassign active child muscle groups before archiving this group.')
+    }
     const result = await db.collection(item.collection).updateOne(
       {
         _id: id,

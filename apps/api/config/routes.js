@@ -6,6 +6,7 @@ module.exports.routes = {
   'GET /api/v1/kiosk/settings': { action: 'kiosk/settings' },
   'GET /api/v1/muscle-groups': { action: 'muscle-groups/index' },
   'GET /api/v1/muscle-groups/:id/equipment': { action: 'muscle-groups/equipment' },
+  'GET /api/v1/exercises': { action: 'exercises/index' },
   'GET /api/v1/equipment/:id/exercises': { action: 'equipment/exercises' },
   'GET /api/v1/exercises/:id': { action: 'exercises/show' },
   'GET /api/v1/exercises/:id/variations': { action: 'exercises/variations' },
@@ -54,6 +55,7 @@ module.exports.routes = {
   'GET /admin/*': { action: 'frontend/index', skipAssets: true },
   'GET /muscle-groups/*': { action: 'frontend/index', skipAssets: true },
   'GET /equipment/*': { action: 'frontend/index', skipAssets: true },
+  'GET /exercises': { action: 'frontend/index', skipAssets: true },
   'GET /exercises/*': { action: 'frontend/index', skipAssets: true },
   'GET /map': { action: 'frontend/index', skipAssets: true },
 }

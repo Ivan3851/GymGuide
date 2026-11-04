@@ -2,12 +2,21 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { localizeApiError } from './api-error.js'
-import { localizeEquipmentUnit, localizeRecord } from './demo-content.js'
+import { localizeEquipmentUnit, localizeRecord } from './content.js'
 import { setLocale, useLocale } from './locale.js'
 import { messages } from './messages.js'
 
 test('English and Macedonian provide the same translation keys', () => {
   assert.deepEqual(Object.keys(messages.en).sort(), Object.keys(messages['mk-MK']).sort())
+})
+
+test('member and admin interface copy contains no demo labels or sample-data warnings', () => {
+  for (const locale of Object.values(messages)) {
+    assert.equal(
+      Object.values(locale).some((value) => /demo|демо/i.test(value)),
+      false,
+    )
+  }
 })
 
 test('the default locale is Macedonian and can switch in the current session', () => {
@@ -31,10 +40,16 @@ test('switching languages leaves the active route and selected record intact', a
 
   setLocale('en')
 
+  const { t } = useLocale()
+  assert.equal(t('admin.gymEquipment'), 'Physical Equipment')
+  assert.equal(t('admin.floorPlans'), 'Floor Plans')
+
   assert.equal(router.currentRoute.value.fullPath, '/exercises/chest-press?machine=press-a')
   assert.equal(router.currentRoute.value.params.id, selectedExercise)
   assert.equal(router.currentRoute.value.query.machine, selectedMachine)
   setLocale('mk-MK')
+  assert.equal(t('admin.gymEquipment'), 'Опрема во теретаната')
+  assert.equal(t('admin.floorPlans'), 'План на просторот')
 })
 
 test('member content uses the selected translation and falls back without modifying the source', () => {
@@ -56,23 +71,7 @@ test('member content uses the selected translation and falls back without modify
   assert.equal(bilingual.summary, 'Legacy summary')
 })
 
-test('demo equipment localization uses a separate slug namespace', () => {
-  const equipment = localizeRecord(
-    { slug: 'leg-press', isDemo: true, name: 'Leg press machine' },
-    'mk-MK',
-    'equipment',
-  )
-  const exercise = localizeRecord(
-    { slug: 'leg-press', isDemo: true, name: 'Leg press' },
-    'mk-MK',
-    'exercise',
-  )
-
-  assert.equal(equipment.name, 'Машина за потисок со нозе')
-  assert.equal(exercise.name, 'Потисок со нозе')
-})
-
-test('gym-authored translations are selected without demo or automatic translations', () => {
+test('gym-authored translations are selected without fabricated translations', () => {
   const authored = {
     slug: 'leg-press',
     isDemo: false,
@@ -86,15 +85,7 @@ test('gym-authored translations are selected without demo or automatic translati
   assert.equal(authored.name, 'My gym name')
 })
 
-test('demo equipment unit labels use the translated equipment type', () => {
-  const unit = localizeEquipmentUnit(
-    { isDemo: true, equipmentTypeId: 'leg-press', displayName: 'Leg press 1' },
-    'mk-MK',
-  )
-  assert.equal(unit.equipmentTypeName, 'Машина за потисок со нозе')
-})
-
-test('gym equipment retains its authored label and localizes its linked equipment type', () => {
+test('equipment retains its authored unit label and localizes the linked equipment type', () => {
   const unit = localizeEquipmentUnit(
     {
       isDemo: false,
@@ -115,6 +106,52 @@ test('gym equipment retains its authored label and localizes its linked equipmen
 
   assert.equal(unit.displayName, 'Leg station by the window')
   assert.equal(unit.equipmentTypeName, 'Потисок со нозе')
+})
+
+test('floor names and physical equipment names localize with existing-field fallback', () => {
+  const floor = {
+    name: 'Главна сала',
+    translations: { 'mk-MK': { name: 'Главна сала' }, en: { name: 'Main gym' } },
+  }
+  assert.equal(localizeRecord(floor, 'mk-MK', 'floorPlan').name, 'Главна сала')
+  assert.equal(localizeRecord(floor, 'en', 'floorPlan').name, 'Main gym')
+
+  const unit = localizeEquipmentUnit(
+    {
+      displayName: 'Преса до прозорец',
+      translations: {
+        'mk-MK': { displayName: 'Преса до прозорец' },
+        en: { displayName: 'Press by window' },
+      },
+      equipmentType: {
+        name: 'Chest press',
+        translations: { 'mk-MK': { name: 'Преса за гради' }, en: { name: 'Chest press' } },
+      },
+    },
+    'en',
+  )
+  assert.equal(unit.displayName, 'Press by window')
+  assert.equal('details' in unit, false)
+  assert.equal('description' in unit, false)
+  assert.equal(unit.equipmentTypeName, 'Chest press')
+})
+
+test('physical equipment localization ignores legacy descriptions without mutating source data', () => {
+  const legacy = {
+    displayName: 'Legacy press',
+    details: 'Old detail',
+    description: 'Old description',
+    translations: {
+      'mk-MK': { displayName: 'Стара преса', details: 'Стар детаљ', description: 'Стар опис' },
+      en: { displayName: 'Legacy press', details: 'Old detail', description: 'Old description' },
+    },
+  }
+  const localized = localizeEquipmentUnit(legacy, 'en')
+  assert.equal(localized.displayName, 'Legacy press')
+  assert.equal('details' in localized, false)
+  assert.equal('description' in localized, false)
+  assert.equal('details' in localized.translations.en, false)
+  assert.equal(legacy.details, 'Old detail')
 })
 
 test('API failures use localized messages by status', () => {

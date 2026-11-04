@@ -9,7 +9,7 @@ import {
 } from '@/api/admin'
 import { useLocale } from '@/localization/locale'
 import { apiErrorMessageKey } from '@/localization/api-error'
-import { localizeEquipmentUnit } from '@/localization/demo-content'
+import { localizeEquipmentUnit, localizeRecord } from '@/localization/content'
 
 const route = useRoute()
 const { locale, t } = useLocale()
@@ -27,11 +27,18 @@ const notice = ref('')
 const saving = ref(false)
 const imageAspectRatio = ref(null)
 const plan = computed(() => plans.value.find((item) => item.id === planId.value))
+const localizedPlans = computed(() =>
+  plans.value.map((item) => ({ ...item, ...localizeRecord(item, locale.value, 'floorPlan') })),
+)
+const localizedPlan = computed(() => localizedPlans.value.find((item) => item.id === planId.value))
 const localizedMarkers = computed(() =>
   markers.value.map((marker) => ({
     ...marker,
     gymEquipment: localizeEquipmentUnit(marker.gymEquipment, locale.value),
   })),
+)
+const localizedInventory = computed(() =>
+  equipment.value.map((unit) => localizeEquipmentUnit(unit, locale.value)),
 )
 const selectedMarker = computed(
   () =>
@@ -39,7 +46,7 @@ const selectedMarker = computed(
     null,
 )
 const availableEquipment = computed(() =>
-  equipment.value.filter(
+  localizedInventory.value.filter(
     (unit) => !markers.value.some((marker) => marker.gymEquipment.id === unit.id),
   ),
 )
@@ -59,7 +66,7 @@ async function load() {
     }))
     const typeById = new Map(allEquipmentTypes.map((item) => [item.id, item]))
     equipment.value = allEquipment
-      .filter((unit) => unit.isActive !== false && unit.isAvailable)
+      .filter((unit) => unit.isActive !== false)
       .map((unit) => ({ ...unit, equipmentType: typeById.get(unit.equipmentTypeId) }))
     if (!planId.value) planId.value = plans.value.find((item) => item.isActive !== false)?.id || ''
     await loadMarkers()
@@ -195,9 +202,8 @@ onMounted(load)
         >{{ t('admin.floorSelect')
         }}<select v-model="planId">
           <option value="" disabled>{{ t('admin.selectFloor') }}</option>
-          <option v-for="item in plans" :key="item.id" :value="item.id">
-            {{ item.floorLabel }} · {{ item.name
-            }}{{ item.isActive === false ? t('floor.archived') : '' }}
+          <option v-for="item in localizedPlans" :key="item.id" :value="item.id">
+            {{ item.name }}{{ item.isActive === false ? t('floor.archived') : '' }}
           </option>
         </select></label
       ><label
@@ -232,7 +238,7 @@ onMounted(load)
           @pointerup="endDrag"
           @pointercancel="endDrag"
         >
-          <img :src="plan.image.contentUrl" :alt="plan.name" @load="setImageAspectRatio" />
+          <img :src="plan.image.contentUrl" :alt="localizedPlan.name" @load="setImageAspectRatio" />
           <button
             v-for="marker in localizedMarkers"
             :key="marker.id"
@@ -253,9 +259,6 @@ onMounted(load)
           <p class="admin-eyebrow">{{ t('admin.selectedEquipment') }}</p>
           <h2>{{ selectedMarker.gymEquipment.displayName }}</h2>
           <p class="admin-muted">{{ selectedMarker.gymEquipment.equipmentTypeName }}</p>
-          <p v-if="selectedMarker.gymEquipment.details" class="admin-muted">
-            {{ selectedMarker.gymEquipment.details }}
-          </p>
           <p class="admin-muted">{{ t('admin.dragInstructions') }}</p>
           <div class="marker-position-fields">
             <label

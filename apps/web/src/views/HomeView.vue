@@ -7,7 +7,7 @@ import { useAsyncData } from '@/composables/useAsyncData'
 import { apiErrorMessageKey } from '@/localization/api-error'
 import { API_HEALTH_KEY } from '@/composables/api-health-key'
 import paljoLogo from '@/assets/brand/paljo-fitness-logo.png'
-import { localizeRecords } from '@/localization/demo-content'
+import { localizeRecords } from '@/localization/content'
 import { useLocale } from '@/localization/locale'
 
 const { isConnected, hasChecked } = inject(API_HEALTH_KEY)

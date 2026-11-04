@@ -17,7 +17,6 @@ defineProps({
       <span aria-hidden="true">←</span>
       {{ backLabel || t('common.back') }}
     </RouterLink>
-    <p class="eyebrow">{{ t('common.demo') }}</p>
     <h1>{{ title }}</h1>
     <p v-if="description" class="page-description">{{ description }}</p>
   </section>

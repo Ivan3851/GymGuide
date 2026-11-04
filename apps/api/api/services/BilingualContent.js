@@ -9,13 +9,19 @@ const schemas = {
     name: { type: 'text', maxLength: 120 },
     description: { type: 'text', maxLength: 500 },
   },
+  'gym-equipment': {
+    displayName: { type: 'text', maxLength: 160 },
+  },
+  'floor-plans': {
+    name: { type: 'text', maxLength: 120 },
+  },
   exercises: {
     name: { type: 'text', maxLength: 160 },
-    summary: { type: 'text', maxLength: 700 },
+    summary: { type: 'text', maxLength: 700, optional: true },
     instructions: { type: 'list' },
-    benefits: { type: 'list' },
-    tips: { type: 'list' },
-    commonMistakes: { type: 'list' },
+    benefits: { type: 'list', optional: true },
+    tips: { type: 'list', optional: true },
+    commonMistakes: { type: 'list', optional: true },
   },
   variations: {
     name: { type: 'text', maxLength: 160 },
@@ -80,14 +86,27 @@ function normalizeForStorage(resource, incoming, legacyData, existing = null) {
               ? legacyData[field]
               : existing?.[field]
       if (value !== undefined) validateValue(value, `${language}.${field}`, fieldSchema)
-      values[language] = value
+      values[language] =
+        fieldSchema.optional &&
+        fieldSchema.type === 'text' &&
+        typeof value === 'string' &&
+        !value.trim()
+          ? ''
+          : value
     }
-    if (isEmpty(values['mk-MK'], fieldSchema.type) && isEmpty(values.en, fieldSchema.type))
+    if (
+      !fieldSchema.optional &&
+      isEmpty(values['mk-MK'], fieldSchema.type) &&
+      isEmpty(values.en, fieldSchema.type)
+    )
       throw ApiError.badRequest(`${field} must be entered in at least one language.`)
 
-    translations['mk-MK'][field] = values['mk-MK'] ?? ''
-    translations.en[field] = values.en ?? ''
-    canonical[field] = isEmpty(values['mk-MK'], fieldSchema.type) ? values.en : values['mk-MK']
+    const emptyValue = fieldSchema.type === 'list' ? [] : ''
+    translations['mk-MK'][field] = values['mk-MK'] ?? emptyValue
+    translations.en[field] = values.en ?? emptyValue
+    canonical[field] = isEmpty(values['mk-MK'], fieldSchema.type)
+      ? (values.en ?? emptyValue)
+      : values['mk-MK']
   }
   return { translations, canonical }
 }

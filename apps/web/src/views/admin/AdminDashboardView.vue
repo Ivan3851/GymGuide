@@ -34,7 +34,7 @@ onMounted(load)
   <section>
     <div class="admin-page-heading">
       <div>
-        <p class="admin-eyebrow">{{ t('admin.dashboardEyebrow') }} · {{ t('admin.demoGym') }}</p>
+        <p class="admin-eyebrow">{{ t('admin.dashboardEyebrow') }}</p>
         <h1>{{ t('admin.dashboardTitle') }}</h1>
         <p class="admin-muted">{{ t('admin.dashboardDescription') }}</p>
       </div>

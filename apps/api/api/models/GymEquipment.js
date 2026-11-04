@@ -6,7 +6,7 @@ module.exports = {
     gymId: { type: 'string', required: true, minLength: 1, maxLength: 80 },
     equipmentTypeId: { type: 'string', required: true, minLength: 1, maxLength: 100 },
     displayName: { type: 'string', required: true, minLength: 1, maxLength: 160 },
-    details: { type: 'string', allowNull: true, maxLength: 1000 },
+    translations: { type: 'json', defaultsTo: {} },
     isAvailable: { type: 'boolean', defaultsTo: true },
     isActive: { type: 'boolean', defaultsTo: true },
     isDemo: { type: 'boolean', defaultsTo: false },

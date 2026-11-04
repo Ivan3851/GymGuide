@@ -3,9 +3,10 @@ import { computed, nextTick, reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { createAdminRecord, getAdmin, setAdminRecordArchived, updateAdminRecord } from '@/api/admin'
 import { adminResourceDefinitions } from '@/admin/admin-resource-definitions'
+import { selectPrimaryMuscle } from '@/admin/exercise-muscle-selection'
 import { useLocale } from '@/localization/locale'
 import { apiErrorMessageKey } from '@/localization/api-error'
-import { localizeRecord } from '@/localization/demo-content'
+import { localizeRecord } from '@/localization/content'
 import { createLatestRequest } from '@/composables/latest-request'
 
 const route = useRoute()
@@ -31,6 +32,20 @@ const form = reactive({})
 const formPanel = ref(null)
 const latestRequest = createLatestRequest()
 const isExercise = computed(() => resource.value === 'exercises')
+const availableMuscleParents = computed(() => {
+  const groups = options['muscle-groups']
+  const excluded = new Set()
+  if (resource.value === 'muscle-groups' && editingId.value) {
+    const queue = [editingId.value]
+    while (queue.length) {
+      const currentId = queue.shift()
+      if (excluded.has(currentId)) continue
+      excluded.add(currentId)
+      for (const group of groups) if (group.parentId === currentId) queue.push(group.id)
+    }
+  }
+  return groups.filter((group) => !excluded.has(group.id))
+})
 const shownRecords = computed(() =>
   resource.value === 'variations' && selectedExercise.value
     ? records.value.filter((record) => record.exerciseId === selectedExercise.value)
@@ -51,6 +66,8 @@ function localizationKind(resourceName = resource.value) {
   if (resourceName === 'equipment-types') return 'equipment'
   if (resourceName === 'variations') return 'variation'
   if (resourceName === 'exercises') return 'exercise'
+  if (resourceName === 'gym-equipment') return 'gymEquipment'
+  if (resourceName === 'floor-plans') return 'floorPlan'
   return 'catalog'
 }
 
@@ -62,10 +79,14 @@ function recordLanguageValue(record, language, field) {
   const otherLanguage = language === 'mk-MK' ? 'en' : 'mk-MK'
   if (Object.hasOwn(record.translations?.[language] || {}, field))
     return record.translations[language][field]
-  const demoAwareRecord = localizeRecord(record, language, localizationKind())
+  if (['gym-equipment', 'floor-plans'].includes(resource.value)) {
+    if (record.translations || language === 'en') return ''
+    return record[field]
+  }
+  const localizedRecord = localizeRecord(record, language, localizationKind())
   const candidates = [
     record.translations?.[otherLanguage]?.[field],
-    demoAwareRecord[field],
+    localizedRecord[field],
     record[field],
   ]
   return candidates.find((value) =>
@@ -107,7 +128,9 @@ function toForm(record) {
   }
   if (isExercise.value) {
     form.primaryMuscleGroupIds = record.primaryMuscleGroupIds || []
-    form.secondaryMuscleGroupIds = record.secondaryMuscleGroupIds || []
+    form.secondaryMuscleGroupIds = [...new Set(record.secondaryMuscleGroupIds || [])].filter(
+      (id) => id !== form.primaryMuscleGroupIds[0],
+    )
     form.equipmentTypeIds = record.equipmentTypeIds || []
     form.videoMediaId = record.videoMediaId || ''
     form.imageMediaIds = record.imageMediaIds || []
@@ -147,6 +170,12 @@ async function load(resourceName = resource.value) {
     if (resourceName === 'exercises')
       jobs.push(
         getAdmin('muscle-groups', { signal }).then((value) => {
+          loadedOptions['muscle-groups'] = value
+        }),
+      )
+    if (resourceName === 'muscle-groups')
+      jobs.push(
+        getAdmin('muscle-groups?includeArchived=true', { signal }).then((value) => {
           loadedOptions['muscle-groups'] = value
         }),
       )
@@ -202,6 +231,11 @@ function toggle(field, id) {
   const values = form[field]
   form[field] = values.includes(id) ? values.filter((value) => value !== id) : [...values, id]
 }
+function changePrimaryMuscle(id) {
+  const selection = selectPrimaryMuscle(id, form.secondaryMuscleGroupIds)
+  form.primaryMuscleGroupIds = selection.primaryIds
+  form.secondaryMuscleGroupIds = selection.secondaryIds
+}
 function payload() {
   const result = {}
   result.translations = { 'mk-MK': {}, en: {} }
@@ -232,7 +266,9 @@ function payload() {
             .filter(Boolean)
         : type === 'number'
           ? Number(value)
-          : value
+          : type === 'optional-select'
+            ? value || null
+            : value
   }
   if (isExercise.value)
     Object.assign(result, {
@@ -277,11 +313,12 @@ async function toggleArchived(record) {
 }
 
 function recordName(record) {
-  return localizedRecord(record).name || record.displayName
+  const localized = localizedRecord(record)
+  return localized.name || localized.displayName || record.displayName
 }
 function recordDescription(record) {
   const localized = localizedRecord(record)
-  return localized.description || localized.summary || record.details
+  return localized.description || localized.summary
 }
 function optionName(kind, id) {
   const option = (options[kind] || []).find((item) => item.id === id)
@@ -289,7 +326,9 @@ function optionName(kind, id) {
 }
 function selectLabel(kind, option) {
   if (kind === 'images') return option.originalName
-  return localizedRecord(option, localizationKind(kind)).name
+  const name = localizedRecord(option, localizationKind(kind)).name
+  if (kind !== 'muscle-groups' || !option.parentId) return name
+  return `${name} · ${t('admin.childOf', { parent: optionName(kind, option.parentId) })}`
 }
 function mediaName(id) {
   return [...options.images, ...options.videos].find((asset) => asset.id === id)?.originalName || id
@@ -372,11 +411,21 @@ onBeforeUnmount(() => latestRequest.cancel())
                 ><span>{{ t(labelKey) }}</span
                 ><input v-model="form[field]" type="checkbox"
               /></template>
-              <template v-else-if="type === 'select'"
+              <template v-else-if="type === 'select' || type === 'optional-select'"
                 ><span>{{ t(labelKey) }}</span
-                ><select v-model="form[field]" required>
-                  <option disabled value="">{{ t('admin.choose') }}</option>
-                  <option v-for="option in options[optionKind]" :key="option.id" :value="option.id">
+                ><select v-model="form[field]" :required="type === 'select'">
+                  <option v-if="type === 'optional-select'" value="">
+                    {{ t('admin.noParent') }}
+                  </option>
+                  <option v-else disabled value="">{{ t('admin.choose') }}</option>
+                  <option
+                    v-for="option in type === 'optional-select'
+                      ? availableMuscleParents
+                      : options[optionKind]"
+                    :key="option.id"
+                    :value="option.id"
+                    :disabled="option.isActive === false"
+                  >
                     {{ selectLabel(optionKind, option) }}
                   </option>
                 </select></template
@@ -419,7 +468,11 @@ onBeforeUnmount(() => latestRequest.cancel())
             </fieldset>
             <label
               ><span>{{ t('admin.primaryMuscle') }}</span
-              ><select v-model="form.primaryMuscleGroupIds[0]" required>
+              ><select
+                :value="form.primaryMuscleGroupIds[0] || ''"
+                required
+                @change="changePrimaryMuscle($event.target.value)"
+              >
                 <option disabled value="">{{ t('admin.chooseOne') }}</option>
                 <option
                   v-for="option in options['muscle-groups']"
@@ -434,6 +487,7 @@ onBeforeUnmount(() => latestRequest.cancel())
               <legend>{{ t('admin.secondaryMuscles') }}</legend>
               <label
                 v-for="option in options['muscle-groups']"
+                v-show="option.id !== form.primaryMuscleGroupIds[0]"
                 :key="option.id"
                 class="admin-check-option"
                 ><input
@@ -508,13 +562,16 @@ onBeforeUnmount(() => latestRequest.cancel())
                 {{ optionName('equipment-types', record.equipmentTypeId) }} ·
                 {{ record.isAvailable ? t('admin.availableStatus') : t('admin.unavailableStatus') }}
               </p>
+              <p v-if="resource === 'muscle-groups' && record.parentId" class="admin-meta">
+                {{ t('admin.childOf', { parent: optionName('muscle-groups', record.parentId) }) }}
+              </p>
               <p v-if="resource === 'variations'" class="admin-meta">
                 {{
                   t('admin.forExercise', { exercise: optionName('exercises', record.exerciseId) })
                 }}
               </p>
               <p v-if="resource === 'floor-plans'" class="admin-meta">
-                {{ record.floorLabel }} · {{ t('admin.image') }}:
+                {{ t('admin.image') }}:
                 {{ mediaName(record.imageMediaId) }}
               </p>
               <p v-if="isExercise" class="admin-meta">

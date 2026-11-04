@@ -90,6 +90,8 @@ test('member header remains horizontal outside admin routes with map and languag
   assert.doesNotMatch(app, /MemberSideMenu|memberMenuOpen/)
   assert.match(header, /<nav class="member-horizontal-nav"/)
   assert.match(header, /to="\/map"/)
+  assert.match(header, /to="\/exercises"/)
+  assert.match(header, /Powered by Ascendra\.mk/)
   assert.match(header, /setLocale\('mk-MK'\)/)
   assert.match(header, /setLocale\('en'\)/)
 })
@@ -115,4 +117,5 @@ test('admin resource view uses guarded abortable loads and guides edit focus', a
 test('direct member map navigation is served by the Sails frontend fallback', async () => {
   const routes = await readFile(new URL('../../api/config/routes.js', import.meta.url), 'utf8')
   assert.match(routes, /'GET \/map': \{ action: 'frontend\/index'/)
+  assert.match(routes, /'GET \/exercises': \{ action: 'frontend\/index'/)
 })

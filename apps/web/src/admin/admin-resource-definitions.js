@@ -6,6 +6,7 @@ export const adminResourceDefinitions = {
     fields: [
       ['name', 'admin.name', 'localized-text'],
       ['description', 'admin.description', 'localized-textarea'],
+      ['parentId', 'admin.parentMuscleGroup', 'optional-select', 'muscle-groups'],
       ['sortOrder', 'admin.sortOrder', 'number'],
     ],
   },
@@ -21,8 +22,7 @@ export const adminResourceDefinitions = {
     titleKey: adminContentResources['gym-equipment'],
     fields: [
       ['equipmentTypeId', 'admin.equipmentType', 'select', 'equipment-types'],
-      ['displayName', 'admin.displayName'],
-      ['details', 'admin.details', 'textarea'],
+      ['displayName', 'admin.name', 'localized-text'],
       ['isAvailable', 'admin.available', 'checkbox'],
     ],
   },
@@ -51,8 +51,7 @@ export const adminResourceDefinitions = {
   'floor-plans': {
     titleKey: adminContentResources['floor-plans'],
     fields: [
-      ['name', 'admin.name'],
-      ['floorLabel', 'admin.floorLabel'],
+      ['name', 'admin.name', 'localized-text'],
       ['imageMediaId', 'admin.floorPlanImage', 'select', 'images'],
       ['sortOrder', 'admin.sortOrder', 'number'],
     ],

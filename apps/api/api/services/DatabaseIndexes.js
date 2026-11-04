@@ -34,6 +34,10 @@ const indexDefinitions = {
   muscleGroups: [
     { keys: { slug: 1 }, options: { unique: true, name: 'uq_muscle_groups_slug' } },
     { keys: { isActive: 1, sortOrder: 1 }, options: { name: 'ix_muscle_groups_active_order' } },
+    {
+      keys: { parentId: 1, isActive: 1, sortOrder: 1 },
+      options: { name: 'ix_muscle_groups_parent_order' },
+    },
   ],
   equipmentTypes: [
     { keys: { slug: 1 }, options: { unique: true, name: 'uq_equipment_types_slug' } },

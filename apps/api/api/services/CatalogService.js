@@ -1,5 +1,7 @@
 const ApiError = require('./ApiError')
 const FloorPlanService = require('./FloorPlanService')
+const MuscleGroupHierarchy = require('./MuscleGroupHierarchy')
+const PrimaryMuscleFilter = require('./PrimaryMuscleFilter')
 
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,139}$/
 
@@ -25,6 +27,23 @@ function toPublic(document) {
   return { ...fields, id: String(_id) }
 }
 
+function publicGymEquipment(document) {
+  const result = toPublic(document)
+  delete result.details
+  delete result.description
+  if (result.translations) {
+    result.translations = Object.fromEntries(
+      Object.entries(result.translations).map(([language, content]) => {
+        const safeContent = { ...(content || {}) }
+        delete safeContent.details
+        delete safeContent.description
+        return [language, safeContent]
+      }),
+    )
+  }
+  return result
+}
+
 function unique(values) {
   return [...new Set(values)]
 }
@@ -43,7 +62,7 @@ async function muscleDetails(db, relations) {
 
   const muscles = await db
     .collection('muscleGroups')
-    .find({ _id: { $in: muscleIds }, isActive: true })
+    .find({ _id: { $in: muscleIds }, isActive: true, isDemo: { $ne: true } })
     .toArray()
   const byId = new Map(muscles.map((muscle) => [String(muscle._id), toPublic(muscle)]))
 
@@ -60,11 +79,63 @@ module.exports = {
     const db = database(sailsInstance)
     const records = await db
       .collection('muscleGroups')
-      .find({ isActive: true })
+      .find({
+        isActive: true,
+        isDemo: { $ne: true },
+        $or: [{ parentId: null }, { parentId: { $exists: false } }],
+      })
       .sort({ sortOrder: 1, name: 1 })
       .toArray()
 
     return records.map(toPublic)
+  },
+
+  getExerciseDirectory: async function getExerciseDirectory(sailsInstance) {
+    const db = database(sailsInstance)
+    const [groups, exercises] = await Promise.all([
+      db
+        .collection('muscleGroups')
+        .find({ isActive: true, isDemo: { $ne: true } })
+        .sort({ sortOrder: 1, name: 1 })
+        .toArray(),
+      db
+        .collection('exercises')
+        .find({ isActive: true, isDemo: { $ne: true } })
+        .sort({ sortOrder: 1, name: 1 })
+        .toArray(),
+    ])
+    const groupRecords = groups.map(toPublic)
+    const groupsById = new Map(groupRecords.map((group) => [group.id, group]))
+    const primaryRelations = exercises.length
+      ? await db
+          .collection('exerciseMuscles')
+          .find({
+            exerciseId: { $in: exercises.map((exercise) => String(exercise._id)) },
+            role: 'primary',
+          })
+          .toArray()
+      : []
+    const primaryByExercise = new Map()
+    for (const relation of primaryRelations) {
+      if (!primaryByExercise.has(relation.exerciseId))
+        primaryByExercise.set(relation.exerciseId, relation.muscleGroupId)
+    }
+    const directoryExercises = exercises.map((exercise) => {
+      const primaryId = primaryByExercise.get(String(exercise._id))
+      const primaryMuscleGroup = primaryId ? groupsById.get(primaryId) : null
+      return {
+        ...toPublic(exercise),
+        primaryMuscleGroup,
+        primaryGroupRootId: primaryMuscleGroup
+          ? MuscleGroupHierarchy.rootIdFor(groupsById, primaryMuscleGroup.id)
+          : null,
+      }
+    })
+    return {
+      muscleGroups: groupRecords,
+      topLevelMuscleGroups: groupRecords.filter((group) => !group.parentId),
+      exercises: directoryExercises,
+    }
   },
 
   getEquipmentForMuscleGroup: async function getEquipmentForMuscleGroup(
@@ -74,17 +145,30 @@ module.exports = {
   ) {
     validateId(muscleGroupId, 'muscle group')
     const db = database(sailsInstance)
-    const muscleGroup = await db
-      .collection('muscleGroups')
-      .findOne({ _id: muscleGroupId, isActive: true })
+    const muscleGroup = await db.collection('muscleGroups').findOne({
+      _id: muscleGroupId,
+      isActive: true,
+      isDemo: { $ne: true },
+    })
     if (!muscleGroup) throw ApiError.notFound('Muscle group not found.')
 
-    const exerciseMuscles = await db.collection('exerciseMuscles').find({ muscleGroupId }).toArray()
+    const activeGroups = await db
+      .collection('muscleGroups')
+      .find({ isActive: true, isDemo: { $ne: true } })
+      .toArray()
+    const groupIds = [...MuscleGroupHierarchy.descendantsOf(activeGroups, muscleGroupId)]
+    const exerciseMuscles = await db
+      .collection('exerciseMuscles')
+      .find({ muscleGroupId: { $in: groupIds }, role: 'primary' })
+      .toArray()
     const linkedExerciseIds = unique(exerciseMuscles.map((relation) => relation.exerciseId))
     const activeExercises = linkedExerciseIds.length
       ? await db
           .collection('exercises')
-          .find({ _id: { $in: linkedExerciseIds }, isActive: true }, { projection: { _id: 1 } })
+          .find(
+            { _id: { $in: linkedExerciseIds }, isActive: true, isDemo: { $ne: true } },
+            { projection: { _id: 1 } },
+          )
           .toArray()
       : []
     const exerciseIds = activeExercises.map((exercise) => String(exercise._id))
@@ -103,7 +187,7 @@ module.exports = {
     const [types, inventory] = await Promise.all([
       db
         .collection('equipmentTypes')
-        .find({ _id: { $in: equipmentTypeIds }, isActive: true })
+        .find({ _id: { $in: equipmentTypeIds }, isActive: true, isDemo: { $ne: true } })
         .sort({ sortOrder: 1, name: 1 })
         .toArray(),
       db
@@ -113,6 +197,7 @@ module.exports = {
           equipmentTypeId: { $in: equipmentTypeIds },
           isAvailable: true,
           isActive: { $ne: false },
+          isDemo: { $ne: true },
         })
         .sort({ displayName: 1 })
         .toArray(),
@@ -121,7 +206,7 @@ module.exports = {
     const inventoryByType = new Map()
     for (const unit of inventory) {
       const units = inventoryByType.get(unit.equipmentTypeId) || []
-      units.push(toPublic(unit))
+      units.push(publicGymEquipment(unit))
       inventoryByType.set(unit.equipmentTypeId, units)
     }
 
@@ -140,31 +225,65 @@ module.exports = {
   getExercisesForEquipment: async function getExercisesForEquipment(
     sailsInstance,
     equipmentTypeId,
+    muscleGroupId = null,
   ) {
     validateId(equipmentTypeId, 'equipment')
     const db = database(sailsInstance)
     const equipmentType = await db
       .collection('equipmentTypes')
       .findOne({ _id: equipmentTypeId, isActive: true })
-    if (!equipmentType) throw ApiError.notFound('Equipment type not found.')
+    if (!equipmentType || equipmentType.isDemo === true)
+      throw ApiError.notFound('Equipment type not found.')
 
     const inventory = await db.collection('gymEquipment').findOne({
       gymId: process.env.GYMGUIDE_GYM_ID || 'demo-gym',
       equipmentTypeId,
       isAvailable: true,
       isActive: { $ne: false },
+      isDemo: { $ne: true },
     })
-    if (!inventory) throw ApiError.notFound('This equipment is not available at the demo gym.')
+    if (!inventory) throw ApiError.notFound('This equipment is not available at this gym.')
 
     const links = await db.collection('exerciseEquipment').find({ equipmentTypeId }).toArray()
     const exerciseIds = unique(links.map((link) => link.exerciseId))
-    const exercises = exerciseIds.length
+    let exercises = exerciseIds.length
       ? await db
           .collection('exercises')
-          .find({ _id: { $in: exerciseIds }, isActive: true })
+          .find({ _id: { $in: exerciseIds }, isActive: true, isDemo: { $ne: true } })
           .sort({ sortOrder: 1, name: 1 })
           .toArray()
       : []
+    if (muscleGroupId) {
+      validateId(muscleGroupId, 'muscle group')
+      const selectedGroup = await db.collection('muscleGroups').findOne({
+        _id: muscleGroupId,
+        isActive: true,
+        isDemo: { $ne: true },
+      })
+      if (!selectedGroup) throw ApiError.notFound('Muscle group not found.')
+      const activeGroups = await db
+        .collection('muscleGroups')
+        .find({ isActive: true, isDemo: { $ne: true } })
+        .toArray()
+      const includedGroups = MuscleGroupHierarchy.descendantsOf(activeGroups, muscleGroupId)
+      const primaryRelations = exercises.length
+        ? await db
+            .collection('exerciseMuscles')
+            .find({
+              exerciseId: { $in: exercises.map((exercise) => String(exercise._id)) },
+              role: 'primary',
+            })
+            .toArray()
+        : []
+      const includedExerciseIds = new Set(
+        PrimaryMuscleFilter.exerciseIdsForPrimaryDescendants(
+          exercises.map((exercise) => String(exercise._id)),
+          primaryRelations,
+          includedGroups,
+        ),
+      )
+      exercises = exercises.filter((exercise) => includedExerciseIds.has(String(exercise._id)))
+    }
     const relations = await findActiveExerciseMuscles(
       db,
       exercises.map((exercise) => String(exercise._id)),
@@ -189,7 +308,11 @@ module.exports = {
   getExerciseDetails: async function getExerciseDetails(sailsInstance, exerciseId) {
     validateId(exerciseId, 'exercise')
     const db = database(sailsInstance)
-    const exercise = await db.collection('exercises').findOne({ _id: exerciseId, isActive: true })
+    const exercise = await db.collection('exercises').findOne({
+      _id: exerciseId,
+      isActive: true,
+      isDemo: { $ne: true },
+    })
     if (!exercise) throw ApiError.notFound('Exercise not found.')
 
     const [muscleRelations, equipmentRelations] = await Promise.all([
@@ -200,7 +323,7 @@ module.exports = {
     const equipmentTypes = equipmentTypeIds.length
       ? await db
           .collection('equipmentTypes')
-          .find({ _id: { $in: equipmentTypeIds }, isActive: true })
+          .find({ _id: { $in: equipmentTypeIds }, isActive: true, isDemo: { $ne: true } })
           .sort({ sortOrder: 1 })
           .toArray()
       : []
@@ -210,7 +333,7 @@ module.exports = {
     const mediaRecords = mediaIds.length
       ? await db
           .collection('mediaAssets')
-          .find({ _id: { $in: mediaIds }, status: 'ready' })
+          .find({ _id: { $in: mediaIds }, status: 'ready', isDemo: { $ne: true } })
           .toArray()
       : []
     const mediaById = new Map(mediaRecords.map((asset) => [String(asset._id), asset]))
@@ -247,12 +370,15 @@ module.exports = {
     const db = database(sailsInstance)
     const exercise = await db
       .collection('exercises')
-      .findOne({ _id: exerciseId, isActive: true }, { projection: { _id: 1 } })
+      .findOne(
+        { _id: exerciseId, isActive: true, isDemo: { $ne: true } },
+        { projection: { _id: 1 } },
+      )
     if (!exercise) throw ApiError.notFound('Exercise not found.')
 
     const variations = await db
       .collection('exerciseVariations')
-      .find({ exerciseId, isActive: true })
+      .find({ exerciseId, isActive: true, isDemo: { $ne: true } })
       .sort({ sortOrder: 1, name: 1 })
       .toArray()
     return variations.map(toPublic)

@@ -8,14 +8,18 @@ import PageHeading from '@/components/shared/PageHeading.vue'
 import StatePanel from '@/components/shared/StatePanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { apiErrorMessageKey } from '@/localization/api-error'
-import { localizeRecord, localizeRecords } from '@/localization/demo-content'
+import { localizeRecord, localizeRecords } from '@/localization/content'
 import { useLocale } from '@/localization/locale'
 
 const route = useRoute()
 const exerciseId = computed(() => String(route.params.id || ''))
 const backTo = computed(() =>
   route.query.fromEquipment
-    ? { name: 'equipment', params: { id: String(route.query.fromEquipment) } }
+    ? {
+        name: 'equipment',
+        params: { id: String(route.query.fromEquipment) },
+        query: route.query.fromMuscle ? { fromMuscle: String(route.query.fromMuscle) } : {},
+      }
     : '/',
 )
 
@@ -51,7 +55,7 @@ watch(exerciseId, (id) => load(id), { immediate: true })
   <div class="browse-view exercise-view">
     <PageHeading
       :title="exercise?.name || t('exercise.fallback')"
-      :description="exercise?.summary || t('exercise.description')"
+      :description="exercise?.summary || ''"
       :back-to="backTo"
       :back-label="t('exercise.back')"
     />
@@ -96,7 +100,7 @@ watch(exerciseId, (id) => load(id), { immediate: true })
         />
       </section>
 
-      <section class="detail-section">
+      <section v-if="exercise.instructions?.length" class="detail-section">
         <p class="eyebrow section-index">{{ t('exercise.sectionGuide') }}</p>
         <h2>{{ t('exercise.steps') }}</h2>
         <ol class="step-list">
@@ -130,7 +134,7 @@ watch(exerciseId, (id) => load(id), { immediate: true })
             </div>
           </template>
         </div>
-        <div class="detail-section">
+        <div v-if="exercise.benefits?.length" class="detail-section">
           <p class="eyebrow section-index">{{ t('exercise.sectionBenefits') }}</p>
           <h2>{{ t('exercise.benefits') }}</h2>
           <ul class="text-list">
@@ -139,15 +143,18 @@ watch(exerciseId, (id) => load(id), { immediate: true })
         </div>
       </section>
 
-      <section class="detail-columns">
-        <div class="detail-section">
+      <section
+        v-if="exercise.tips?.length || exercise.commonMistakes?.length"
+        class="detail-columns"
+      >
+        <div v-if="exercise.tips?.length" class="detail-section">
           <p class="eyebrow section-index">{{ t('exercise.sectionForm') }}</p>
           <h2>{{ t('exercise.tips') }}</h2>
           <ul class="text-list">
             <li v-for="tip in exercise.tips" :key="tip">{{ tip }}</li>
           </ul>
         </div>
-        <div class="detail-section detail-section-warning">
+        <div v-if="exercise.commonMistakes?.length" class="detail-section detail-section-warning">
           <p class="eyebrow section-index">{{ t('exercise.sectionMistakes') }}</p>
           <h2>{{ t('exercise.mistakes') }}</h2>
           <ul class="text-list">
@@ -178,8 +185,6 @@ watch(exerciseId, (id) => load(id), { immediate: true })
       </section>
 
       <ExerciseFloorPlan :locations="exercise.equipmentLocations" />
-
-      <p v-if="exercise.isDemo" class="demo-note">{{ t('exercise.demoNote') }}</p>
     </template>
   </div>
 </template>

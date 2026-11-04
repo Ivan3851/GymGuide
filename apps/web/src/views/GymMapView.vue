@@ -6,7 +6,7 @@ import FloorPlanCanvas from '@/components/floor-plan/FloorPlanCanvas.vue'
 import { getGymMapFloorPlans } from '@/api/catalog'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { apiErrorMessageKey } from '@/localization/api-error'
-import { localizeEquipmentUnit } from '@/localization/demo-content'
+import { localizeEquipmentUnit, localizeRecord } from '@/localization/content'
 import { useLocale } from '@/localization/locale'
 import { validMapMarkers } from '@/components/map/valid-map-markers'
 
@@ -21,7 +21,7 @@ const selectedFloorId = ref('')
 const selectedEquipmentId = ref('')
 const floors = computed(() =>
   (floorPlans.value || []).map((floor) => ({
-    ...floor,
+    ...localizeRecord(floor, locale.value, 'floorPlan'),
     markers: validMapMarkers(floor.markers),
   })),
 )
@@ -95,7 +95,7 @@ watch(selectedFloorId, (floorId) => {
           {{ t('floor.floor') }}
           <select v-model="selectedFloorId">
             <option v-for="floor in floors" :key="floor.id" :value="floor.id">
-              {{ floor.floorLabel }} · {{ floor.name }}
+              {{ floor.name }}
             </option>
           </select>
         </label>
@@ -121,7 +121,6 @@ watch(selectedFloorId, (floorId) => {
             <p class="eyebrow">{{ t('map.equipmentInfo') }}</p>
             <h2>{{ localizedEquipment.displayName }}</h2>
             <p class="gym-map-type">{{ localizedEquipment.equipmentTypeName }}</p>
-            <p v-if="localizedEquipment.details">{{ localizedEquipment.details }}</p>
           </template>
           <p v-else class="admin-muted">{{ t('map.selectMachine') }}</p>
           <div v-if="!currentFloor.markers.length" class="gym-map-empty-floor" role="status">

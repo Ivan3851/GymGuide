@@ -7,19 +7,21 @@ import SelectionCard from '@/components/shared/SelectionCard.vue'
 import StatePanel from '@/components/shared/StatePanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { apiErrorMessageKey } from '@/localization/api-error'
-import { localizeRecord } from '@/localization/demo-content'
+import { localizeRecord } from '@/localization/content'
 import { useLocale } from '@/localization/locale'
 
 const route = useRoute()
 const equipmentId = computed(() => String(route.params.id || ''))
+const muscleGroupId = computed(() => String(route.query.fromMuscle || ''))
 const backTo = computed(() =>
   route.query.fromMuscle
     ? { name: 'muscle-group', params: { id: String(route.query.fromMuscle) } }
     : '/',
 )
 const { locale, t } = useLocale()
-const { data, isLoading, error, load } = useAsyncData(getEquipmentExercises, (problem) =>
-  apiErrorMessageKey(problem),
+const { data, isLoading, error, load } = useAsyncData(
+  ({ equipmentId: id, muscleGroupId: groupId }) => getEquipmentExercises(id, groupId),
+  (problem) => apiErrorMessageKey(problem),
 )
 const errorMessage = computed(() => (error.value ? t(error.value) : ''))
 const equipmentType = computed(() =>
@@ -33,7 +35,11 @@ const exercises = computed(
     })) || [],
 )
 
-watch(equipmentId, (id) => load(id), { immediate: true })
+watch(
+  [equipmentId, muscleGroupId],
+  ([id, selectedMuscleGroupId]) => load({ equipmentId: id, muscleGroupId: selectedMuscleGroupId }),
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -56,7 +62,7 @@ watch(equipmentId, (id) => load(id), { immediate: true })
       :message="errorMessage"
       tone="error"
       :action-label="t('common.retry')"
-      @action="load(equipmentId)"
+      @action="load({ equipmentId, muscleGroupId })"
     />
     <StatePanel
       v-else-if="!data?.exercises?.length"
@@ -70,13 +76,15 @@ watch(equipmentId, (id) => load(id), { immediate: true })
         :to="{
           name: 'exercise',
           params: { id: exercise.id },
-          query: { fromEquipment: equipmentId },
+          query: {
+            fromEquipment: equipmentId,
+            ...(route.query.fromMuscle ? { fromMuscle: String(route.query.fromMuscle) } : {}),
+          },
         }"
         :title="exercise.name"
         :description="exercise.summary"
         :detail="exercise.muscles.map((muscle) => muscle.name).join(' · ')"
       />
     </section>
-    <p v-if="equipmentType?.isDemo" class="demo-note">{{ t('equipment.demoNote') }}</p>
   </div>
 </template>

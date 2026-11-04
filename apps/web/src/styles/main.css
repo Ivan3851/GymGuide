@@ -710,12 +710,6 @@ p {
   border-color: var(--color-accent);
 }
 
-.demo-note {
-  margin: 20px 0 0;
-  color: var(--color-text-subtle);
-  font-size: 12px;
-}
-
 .video-placeholder {
   display: grid;
   min-height: 280px;
